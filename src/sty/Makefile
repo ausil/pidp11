@@ -30,6 +30,6 @@ sty: $(OBJ)
 	$(CC) -o $@ $(OBJ) $(STLDFLAGS)
 
 clean:
-	rm -f st $(OBJ) st-$(VERSION).tar.gz
+	rm -f sty $(OBJ) st-$(VERSION).tar.gz
 
 .PHONY: all options clean 

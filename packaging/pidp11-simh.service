@@ -7,7 +7,6 @@ Requires=pidp11-server.service
 Type=forking
 User=pidp11
 Group=pidp11
-RuntimeDirectory=pidp11
 WorkingDirectory=/var/lib/pidp11/systems
 # Attach with: pdp11   (see /usr/share/pidp11/README for the sudo setup)
 ExecStart=/usr/bin/screen -dmS pidp11 /usr/libexec/pidp11/pidp11-run

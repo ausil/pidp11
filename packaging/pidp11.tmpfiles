@@ -1,3 +1,6 @@
+# Scratch space shared by the two services (boot command file)
+d /run/pidp11             0755 pidp11 pidp11 -
+
 # Writable disk images, shared by every system; only the service writes here
 d /var/lib/pidp11          0755 pidp11 pidp11 -
 d /var/lib/pidp11/systems  0755 pidp11 pidp11 -
