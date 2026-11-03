@@ -45,6 +45,7 @@
 extern blinkenlight_panel_t *gpiopattern_blinkenlight_panel ;
 
 extern volatile uint32_t gpio_switchstatus[3] ; // bitfields: 3 rows of up to 12 switches
+extern volatile int gpio_hw_ready ; // 1 once gpio_switchstatus[] holds valid data from real hardware
 // extern volatile uint32_t gpio_ledstatus[8] ; // bitfields: 8 ledrows of up to 12 LEDs
 
 extern int gpiopattern_ledstatus_phases_readidx ; // read page, used by GPIO mux

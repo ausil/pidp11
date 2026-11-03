@@ -243,6 +243,8 @@ void *blink(int *terminate)
 				gpio_switchstatus[i] = switchscan;
 
 			}
+			// a full scan of all switch rows is now in gpio_switchstatus[]
+			gpio_hw_ready = 1;
 			//printf("\n");
 		}
 	}

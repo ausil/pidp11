@@ -113,6 +113,11 @@ extern int knobValue[2];
 // remains here for symmetry cause
 volatile uint32_t gpio_switchstatus[3] =
 { 0 }; // bitfields: 3 rows of up to 12 switches
+
+// Set to 1 by the GPIO scan thread only after real front panel hardware has been
+// initialised and gpio_switchstatus[] holds a complete scan. Without hardware the
+// switch bits are all 0, which must NOT be interpreted as "power switch off".
+volatile int gpio_hw_ready = 0;
 // volatile uint32_t gpio_ledstatus[8] = { 0 }; // bitfields: 8 ledrows of up to 12 LEDs
 
 /*

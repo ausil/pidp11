@@ -137,7 +137,11 @@ static void on_blinkenlight_api_panel_get_controlvalues(blinkenlight_panel_t *p)
 			{
                 c->value = ((gpio_switchstatus[1] & 1<<10)==0?0:1); // send "power switch" signal
 				//printf("%" PRIu64 " ",c->value);
-				if ((c->value)==0)
+				// Without real front panel hardware gpio_switchstatus[] is all zeros, which
+				// looks like "power switch off". The value is still passed on to the client
+				// unchanged, but the host shutdown/reboot below must only happen after the
+				// GPIO thread has delivered a real switch scan.
+				if (gpio_hw_ready && (c->value)==0)
 				{
 					if (pwrDebounce==0)	// do it only once, when power button is triggered
 					{
