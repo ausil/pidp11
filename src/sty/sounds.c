@@ -31,49 +31,55 @@ extern int tty_soundmode; // 0=mute, 1=lid_closed, 2=lid_open
 // ============
 
 
+/* Where the .wav files live. Override at build time, e.g.
+ * CPPFLAGS='-DPIDP11_SOUNDDIR=\"/usr/share/pidp11/sounds\"' */
+#ifndef PIDP11_SOUNDDIR
+#define PIDP11_SOUNDDIR "/opt/pidp11/bin/sounds"
+#endif
+
 #define NUM_WAVEFORMS 40
 const char* _waveFileNames[] =
 {
-  "/opt/pidp11/bin/sounds/down-bell.wav",   // 0
-  "/opt/pidp11/bin/sounds/down-cr-01.wav",  // 1
-  "/opt/pidp11/bin/sounds/down-cr-02.wav",  // 2
-  "/opt/pidp11/bin/sounds/down-cr-03.wav",  // 3
-  "/opt/pidp11/bin/sounds/down-hum.wav",    // 4
-  "/opt/pidp11/bin/sounds/down-key-01.wav", // 5
-  "/opt/pidp11/bin/sounds/down-key-02.wav", // 6
-  "/opt/pidp11/bin/sounds/down-key-03.wav", // 7
-  "/opt/pidp11/bin/sounds/down-key-04.wav", // 8
-  "/opt/pidp11/bin/sounds/down-key-05.wav", // 9
-  "/opt/pidp11/bin/sounds/down-key-06.wav", // 10
-  "/opt/pidp11/bin/sounds/down-key-07.wav", // 11
-  "/opt/pidp11/bin/sounds/down-lid.wav",    // 12
-  "/opt/pidp11/bin/sounds/down-motor-off.wav",  // 13
-  "/opt/pidp11/bin/sounds/down-motor-on.wav",   // 14
-  "/opt/pidp11/bin/sounds/down-platen.wav",     // 15
-  "/opt/pidp11/bin/sounds/down-print-chars-01.wav",     // 16
-  "/opt/pidp11/bin/sounds/down-print-chars-02.wav",     // 17
-  "/opt/pidp11/bin/sounds/down-print-spaces-01.wav",    // 18
-  "/opt/pidp11/bin/sounds/down-print-spaces-02.wav",    // 19
-  "/opt/pidp11/bin/sounds/up-bell.wav",     // 20
-  "/opt/pidp11/bin/sounds/up-cr-01.wav",    // 21
-  "/opt/pidp11/bin/sounds/up-cr-02.wav",    // 22
-  "/opt/pidp11/bin/sounds/up-cr-03.wav",    // 23
-  "/opt/pidp11/bin/sounds/up-hum.wav",      // 24
-  "/opt/pidp11/bin/sounds/up-key-01.wav",   // 25
-  "/opt/pidp11/bin/sounds/up-key-02.wav",   // 26
-  "/opt/pidp11/bin/sounds/up-key-03.wav",   // 27
-  "/opt/pidp11/bin/sounds/up-key-04.wav",   // 28
-  "/opt/pidp11/bin/sounds/up-key-05.wav",   // 29
-  "/opt/pidp11/bin/sounds/up-key-06.wav",   // 30
-  "/opt/pidp11/bin/sounds/up-key-07.wav",   // 31
-  "/opt/pidp11/bin/sounds/up-lid.wav",      // 32
-  "/opt/pidp11/bin/sounds/up-motor-off.wav",    // 33
-  "/opt/pidp11/bin/sounds/up-motor-on.wav",     // 34
-  "/opt/pidp11/bin/sounds/up-platen.wav",       // 35
-  "/opt/pidp11/bin/sounds/up-print-chars-01.wav",   // 36
-  "/opt/pidp11/bin/sounds/up-print-chars-02.wav",   // 37
-  "/opt/pidp11/bin/sounds/up-print-spaces-01.wav",  // 38
-  "/opt/pidp11/bin/sounds/up-print-spaces-02.wav"   // 39
+  PIDP11_SOUNDDIR "/down-bell.wav",   // 0
+  PIDP11_SOUNDDIR "/down-cr-01.wav",  // 1
+  PIDP11_SOUNDDIR "/down-cr-02.wav",  // 2
+  PIDP11_SOUNDDIR "/down-cr-03.wav",  // 3
+  PIDP11_SOUNDDIR "/down-hum.wav",    // 4
+  PIDP11_SOUNDDIR "/down-key-01.wav", // 5
+  PIDP11_SOUNDDIR "/down-key-02.wav", // 6
+  PIDP11_SOUNDDIR "/down-key-03.wav", // 7
+  PIDP11_SOUNDDIR "/down-key-04.wav", // 8
+  PIDP11_SOUNDDIR "/down-key-05.wav", // 9
+  PIDP11_SOUNDDIR "/down-key-06.wav", // 10
+  PIDP11_SOUNDDIR "/down-key-07.wav", // 11
+  PIDP11_SOUNDDIR "/down-lid.wav",    // 12
+  PIDP11_SOUNDDIR "/down-motor-off.wav",  // 13
+  PIDP11_SOUNDDIR "/down-motor-on.wav",   // 14
+  PIDP11_SOUNDDIR "/down-platen.wav",     // 15
+  PIDP11_SOUNDDIR "/down-print-chars-01.wav",     // 16
+  PIDP11_SOUNDDIR "/down-print-chars-02.wav",     // 17
+  PIDP11_SOUNDDIR "/down-print-spaces-01.wav",    // 18
+  PIDP11_SOUNDDIR "/down-print-spaces-02.wav",    // 19
+  PIDP11_SOUNDDIR "/up-bell.wav",     // 20
+  PIDP11_SOUNDDIR "/up-cr-01.wav",    // 21
+  PIDP11_SOUNDDIR "/up-cr-02.wav",    // 22
+  PIDP11_SOUNDDIR "/up-cr-03.wav",    // 23
+  PIDP11_SOUNDDIR "/up-hum.wav",      // 24
+  PIDP11_SOUNDDIR "/up-key-01.wav",   // 25
+  PIDP11_SOUNDDIR "/up-key-02.wav",   // 26
+  PIDP11_SOUNDDIR "/up-key-03.wav",   // 27
+  PIDP11_SOUNDDIR "/up-key-04.wav",   // 28
+  PIDP11_SOUNDDIR "/up-key-05.wav",   // 29
+  PIDP11_SOUNDDIR "/up-key-06.wav",   // 30
+  PIDP11_SOUNDDIR "/up-key-07.wav",   // 31
+  PIDP11_SOUNDDIR "/up-lid.wav",      // 32
+  PIDP11_SOUNDDIR "/up-motor-off.wav",    // 33
+  PIDP11_SOUNDDIR "/up-motor-on.wav",     // 34
+  PIDP11_SOUNDDIR "/up-platen.wav",       // 35
+  PIDP11_SOUNDDIR "/up-print-chars-01.wav",   // 36
+  PIDP11_SOUNDDIR "/up-print-chars-02.wav",   // 37
+  PIDP11_SOUNDDIR "/up-print-spaces-01.wav",  // 38
+  PIDP11_SOUNDDIR "/up-print-spaces-02.wav"   // 39
 };
 
 Mix_Chunk* _sample[NUM_WAVEFORMS]; // was 2

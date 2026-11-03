@@ -69,6 +69,12 @@
 ///// for Blinkenlight API server
 #include "rpc_blinkenlight_api.h"
 #include <rpc/pmap_clnt.h> 
+
+/* Directory holding rebootsimh.sh and down.sh. Override at build time with
+ * OS_CCDEFS='-DPIDP11_LIBEXECDIR=\"/usr/libexec/pidp11\"' */
+#ifndef PIDP11_LIBEXECDIR
+#define PIDP11_LIBEXECDIR "/opt/pidp11/bin"
+#endif
 #ifndef SIG_PF
 #define SIG_PF void(*)(int)
 #endif
@@ -150,14 +156,14 @@ static void on_blinkenlight_api_panel_get_controlvalues(blinkenlight_panel_t *p)
 						
 						if (switch_HALT->value==0)
 						{
-							sprintf(buffer,"/opt/pidp11/bin/rebootsimh.sh");
+							snprintf(buffer,sizeof buffer,"%s/rebootsimh.sh",PIDP11_LIBEXECDIR);
 							FILE *bootfil = popen(buffer, "r");
 							printf("\r\n--> Rebooting...\r\n");
 							pclose(bootfil);
 						}
 						else
 						{
-							sprintf(buffer,"/opt/pidp11/bin/down.sh");
+							snprintf(buffer,sizeof buffer,"%s/down.sh",PIDP11_LIBEXECDIR);
 							FILE *bootfil = popen(buffer, "r");
 							printf("--> System shutdown - allow 15 seconds before power off\r\n");
 							pclose(bootfil);
