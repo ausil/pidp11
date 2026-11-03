@@ -10,7 +10,7 @@
 # own settings
 OS_CCDEFS =
 CC_DBG_FLAGS = -ggdb3 -O0
-LDFLAGS = -pthread
+LDFLAGS = -pthread $(shell pkg-config --libs libgpiod)
 
 	# all other cases: X86
 	OBJDIR=x86
@@ -83,17 +83,14 @@ SOURCES.h = \
 	gpio.h	\
 	gpiopattern.h	\
 	$(BLINKENLIGHT_SERVER_DIR)/print.h	\
-	$(BLINKENLIGHT_API_DIR)/blinkenlight_panels.h	\
-	pinctrl/gpiochip.h	pinctrl/gpiolib.h pinctrl/util.h
+	$(BLINKENLIGHT_API_DIR)/blinkenlight_panels.h
 
 SOURCES.c = \
 	main.c	\
 	gpio.c	\
 	gpiopattern.c	\
 	$(BLINKENLIGHT_SERVER_DIR)/print.c	\
-	$(BLINKENLIGHT_API_SOURCES.c)	\
-	pinctrl/gpiochip_bcm2712.c  pinctrl/gpiochip_rp1.c  pinctrl/util.c \
-	pinctrl/gpiochip_bcm2835.c  pinctrl/gpiolib.c       pinctrl/pinctrl.c
+	$(BLINKENLIGHT_API_SOURCES.c)
 
 
 

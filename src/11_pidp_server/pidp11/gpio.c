@@ -47,14 +47,12 @@
 #include "gpiopattern.h"
 
 
-//20231218
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#include "pinctrl/gpiolib.h"
-//-20231218
-
+#include <stdio.h>
+#include <gpiod.h>
 
 typedef unsigned int uint32;
 typedef signed int int32;
@@ -73,104 +71,151 @@ long intervl = 50000; // light each row of leds 50 us
 
 // PART 2 - the multiplexing logic driving the front panel -------------
 
-uint8_t ledrows[] = {20, 21, 22, 23, 24, 25};
-uint8_t rows[] = {16, 17, 18};
-uint8_t cols[] = {26,27,4, 5,6,7, 8,9,10, 11,12,13};
+/* GPIO numbers on the 40-pin header (BCM numbering = line offset on the
+ * header GPIO chip). */
+#define N_LEDROWS 6
+#define N_ROWS    3
+#define N_COLS    12
+static const unsigned int ledrows[N_LEDROWS] = {20, 21, 22, 23, 24, 25};
+static const unsigned int rows[N_ROWS]       = {16, 17, 18};
+static const unsigned int cols[N_COLS]       = {26,27,4, 5,6,7, 8,9,10, 11,12,13};
 
+#define CONSUMER "pidp11"
+
+/* Find the GPIO chip that carries the 40-pin header. Its number differs
+ * between Pi models (gpiochip4 on a Pi 5, gpiochip0 on a Pi 4), so look for
+ * a "pinctrl-*" chip with enough lines instead of using a fixed index.
+ * PIDP11_GPIOCHIP=/dev/gpiochipN overrides the search. */
+static struct gpiod_chip *open_header_chip(void)
+{
+	const char *forced = getenv("PIDP11_GPIOCHIP");
+	char path[32];
+	int n;
+
+	if (forced)
+		return gpiod_chip_open(forced);
+
+	for (n = 0; n < 64; n++) {
+		struct gpiod_chip *chip;
+		struct gpiod_chip_info *info;
+		int match = 0;
+
+		snprintf(path, sizeof path, "/dev/gpiochip%d", n);
+		chip = gpiod_chip_open(path);
+		if (!chip)
+			continue;
+		info = gpiod_chip_get_info(chip);
+		if (info) {
+			const char *label = gpiod_chip_info_get_label(info);
+			match = label && strncmp(label, "pinctrl-", 8) == 0
+				&& gpiod_chip_info_get_num_lines(info) >= 28;
+			gpiod_chip_info_free(info);
+		}
+		if (match)
+			return chip;
+		gpiod_chip_close(chip);
+	}
+	return NULL;
+}
+
+static struct gpiod_line_config *make_config(const unsigned int *offsets, size_t n,
+		enum gpiod_line_direction dir, enum gpiod_line_bias bias)
+{
+	struct gpiod_line_settings *ls = gpiod_line_settings_new();
+	struct gpiod_line_config *lc = gpiod_line_config_new();
+
+	if (!ls || !lc)
+		goto fail;
+	gpiod_line_settings_set_direction(ls, dir);
+	gpiod_line_settings_set_bias(ls, bias);
+	if (dir == GPIOD_LINE_DIRECTION_OUTPUT)
+		gpiod_line_settings_set_output_value(ls, GPIOD_LINE_VALUE_INACTIVE);
+	if (gpiod_line_config_add_line_settings(lc, offsets, n, ls) < 0)
+		goto fail;
+	gpiod_line_settings_free(ls);
+	return lc;
+fail:
+	gpiod_line_settings_free(ls);
+	gpiod_line_config_free(lc);
+	return NULL;
+}
+
+static struct gpiod_line_request *request_lines(struct gpiod_chip *chip,
+		const unsigned int *offsets, size_t n,
+		enum gpiod_line_direction dir, enum gpiod_line_bias bias)
+{
+	struct gpiod_line_config *lc = make_config(offsets, n, dir, bias);
+	struct gpiod_request_config *rc = gpiod_request_config_new();
+	struct gpiod_line_request *req = NULL;
+
+	if (lc && rc) {
+		gpiod_request_config_set_consumer(rc, CONSUMER);
+		req = gpiod_chip_request_lines(chip, rc, lc);
+	}
+	gpiod_request_config_free(rc);
+	gpiod_line_config_free(lc);
+	return req;
+}
+
+/* Change direction (and pull) of every line in a request. Output lines
+ * start low. */
+static int reconfigure(struct gpiod_line_request *req, const unsigned int *offsets,
+		size_t n, enum gpiod_line_direction dir, enum gpiod_line_bias bias)
+{
+	struct gpiod_line_config *lc = make_config(offsets, n, dir, bias);
+	int ret;
+
+	if (!lc)
+		return -1;
+	ret = gpiod_line_request_reconfigure_lines(req, lc);
+	gpiod_line_config_free(lc);
+	return ret;
+}
+
+#define IN_PULLUP  GPIOD_LINE_DIRECTION_INPUT,  GPIOD_LINE_BIAS_PULL_UP
+#define OUT        GPIOD_LINE_DIRECTION_OUTPUT, GPIOD_LINE_BIAS_AS_IS
 
 void *blink(int *terminate)
 {
-	int i, j, k, switchscan, tmp;
+	struct gpiod_chip *chip;
+	struct gpiod_line_request *ledrow_req, *col_req, *row_req[N_ROWS];
+	enum gpiod_line_value colvals[N_COLS];
+	int i, j, k, switchscan;
+	int failed = 0;
 
-	// init GPIO stuff ----------
-        int num_gpios;
-	int ret;
-
-	ret = gpiolib_init();
-
-	if (ret < 0)
-	{
-		printf("Failed to initialise gpiolib - %d\n", ret);
-		return (void *)-1;
-	}
-
-	num_gpios = ret;
-	if (!num_gpios)
-	{
+	chip = open_header_chip();
+	if (!chip) {
 		printf("No GPIO chips found\n");
 		return (void *)-1;
 	}
 
-	// -----
-	uint32_t gpiomask[(MAX_GPIO_PINS + 31)/32] = { 0 };
-#define ARRAY_SIZE(_a) (sizeof(_a)/sizeof(_a[0]))
-	for (i = ARRAY_SIZE(gpiomask) - 1; i >= 0; i--)
-	{
-		if (gpiomask[i])
-			break;
-	}
-	if (i < 0)
-		memset(gpiomask, 0xff, sizeof(gpiomask));
+	// LED rows: outputs, off. Columns: outputs, low. Switch rows: inputs with pull-up.
+	ledrow_req = request_lines(chip, ledrows, N_LEDROWS, OUT);
+	col_req = request_lines(chip, cols, N_COLS, OUT);
+	for (i = 0; i < N_ROWS; i++)
+		row_req[i] = request_lines(chip, &rows[i], 1, IN_PULLUP);
 
-	ret = gpiolib_mmap();
-	if (ret)
-	{
-		if (ret == EACCES && geteuid())
-			printf("Must be root\n");
-		else
-			printf("Failed to mmap gpiolib - %s\n", strerror(ret));
-		return (void *)-1;
+	if (!ledrow_req || !col_req || !row_req[0] || !row_req[1] || !row_req[2]) {
+		printf("Failed to request GPIO lines - %s\n", strerror(errno));
+		failed = 1;
+		goto out;
 	}
-	
+
 	// set thread to real time priority -----------------
 	struct sched_param sp;
 	sp.sched_priority = 98; // maybe 99, 32, 31?
-	if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp)) 
+	if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp))
 	{
 		fprintf(stderr, "warning: failed to set RT priority\n");
 	}
 
-	// initialise GPIO (all pins used as inputs, with pull-ups enabled on cols)
-/*	for (i = 0; i < 6; i++)  // Define ledrows as input
-	for (i = 0; i < 12; i++) // Define cols as input
-	for (i = 0; i < 3; i++) // Define rows as input
-*/
-	// GPIO column pins - input pullup
-	// GPIO row pins - input pullup
-	// GPIO ledrow pins - input pullup
-	// --------------------------------------------------
-	for (i=0;i<6;i++)
-	{
-
-		gpio_set_fsel(ledrows[i], GPIO_FSEL_OUTPUT);
-		gpio_set_dir(ledrows[i], DIR_OUTPUT);
-		gpio_set_drive(ledrows[i], DRIVE_LOW);
-	}
-	for (i=0;i<12;i++)
-	{
-		gpio_set_fsel(cols[i], GPIO_FSEL_OUTPUT);
-		gpio_set_pull(cols[i], PULL_UP);
-		gpio_set_dir(cols[i], DIR_OUTPUT);
-		gpio_set_drive(cols[i], DRIVE_LOW);
-	}
-	for (i=0;i<3;i++)
-	{
-		gpio_set_fsel(rows[i], GPIO_FSEL_INPUT);
-		//gpio_set_dir(rows[i], DIR_INPUT);
-		gpio_set_pull(rows[i], PULL_UP);
-	}
-
 	printf("\nPiDP-11 FP 2023\n");
 
-// ========== TEMPORARY TEST LOOP
-	while (*terminate == 0) {
+	while (*terminate == 0 && !failed) {
 		unsigned phase;
-		//unsigned loopcount=0;
-		//if ((loopcount++ % 500) == 0)	printf("1\n"); // visual heart beat
-
 
 		// display all phases circular
-		for (phase = 0; phase < GPIOPATTERN_LED_BRIGHTNESS_PHASES; phase++) {
+		for (phase = 0; phase < GPIOPATTERN_LED_BRIGHTNESS_PHASES && !failed; phase++) {
 			// each phase must be eact same duration, so include switch scanning here
 
 			// the original gpio_ledstatus[8] runs trough all phases
@@ -178,64 +223,71 @@ void *blink(int *terminate)
 					gpiopattern_ledstatus_phases[gpiopattern_ledstatus_phases_readidx][phase];
 
 			// prepare for lighting LEDs by setting col pins to output
-			for (i = 0; i < 12; i++) {
-				gpio_set_dir(cols[i], DIR_OUTPUT);
+			if (reconfigure(col_req, cols, N_COLS, OUT) < 0) {
+				failed = 1;
+				break;
 			}
 
 			// light up 6 rows of 12 LEDs each
-			for (i = 0; i < 6; i++) {
+			for (i = 0; i < N_LEDROWS; i++) {
 
-				// Toggle columns for this ledrow (which LEDs should be on (CLR = on))
-				for (k = 0; k < 12; k++) {
-					if ((gpio_ledstatus[i] & (1 << k)) == 0)
-						gpio_set_drive(cols[k], DRIVE_HIGH);
-					else
-						gpio_set_drive(cols[k], DRIVE_LOW);
-				}
+				// Set the columns for this ledrow (which LEDs should be on (CLR = on))
+				for (k = 0; k < N_COLS; k++)
+					colvals[k] = (gpio_ledstatus[i] & (1 << k)) == 0
+							? GPIOD_LINE_VALUE_ACTIVE : GPIOD_LINE_VALUE_INACTIVE;
+				if (gpiod_line_request_set_values(col_req, colvals) < 0)
+					failed = 1;
 
 				// Toggle this ledrow on
-				gpio_set_drive(ledrows[i], DRIVE_HIGH);
+				if (gpiod_line_request_set_value(ledrow_req, ledrows[i],
+						GPIOD_LINE_VALUE_ACTIVE) < 0)
+					failed = 1;
 
 				nanosleep((struct timespec[]
 				)	{	{	0, intervl}}, NULL);
 
 				// Toggle ledrow off
-				gpio_set_drive(ledrows[i], DRIVE_LOW);
+				if (gpiod_line_request_set_value(ledrow_req, ledrows[i],
+						GPIOD_LINE_VALUE_INACTIVE) < 0)
+					failed = 1;
 
 				usleep(10); // waste of cpu cycles but may help against udn2981 ghosting, not flashes though
 			}
 
-			//nanosleep ((struct timespec[]){{0, intervl}}, NULL); // test
-
-			// prepare for reading switches
-			for (i = 0; i < 12; i++)			// flip columns to input 
-				gpio_set_dir(cols[i], DIR_INPUT);	// Need intl pull-ups enabled
+			// prepare for reading switches: flip columns to input, pull-ups on
+			if (reconfigure(col_req, cols, N_COLS, IN_PULLUP) < 0) {
+				failed = 1;
+				break;
+			}
 
 			// read three rows of switches
-			for (i = 0; i < 3; i++)
+			for (i = 0; i < N_ROWS; i++)
 			{
-				// on one row pin, 
+				// on one row pin,
 				// output 0V to overrule the built-in pull-up from column input pin
 				// to read this row of switches
-				gpio_set_dir(rows[i], DIR_OUTPUT);
-				gpio_set_drive(rows[i], DRIVE_LOW);
+				if (reconfigure(row_req[i], &rows[i], 1, OUT) < 0) {
+					failed = 1;
+					break;
+				}
 
-				nanosleep((struct timespec[]) { { 0, intervl / 100}}, NULL); 
+				nanosleep((struct timespec[]) { { 0, intervl / 100}}, NULL);
 				// probably unnecessary long wait
 
-				switchscan = 0;
-				for (j = 0; j < 12; j++) // 12 switches in each row
-				{
-					tmp = gpio_get_level(cols[j]);
-					if (tmp != 0)
-						switchscan += 1 << j;
-	
-					//printf("-%d",tmp);
+				if (gpiod_line_request_get_values(col_req, colvals) < 0) {
+					failed = 1;
+					break;
 				}
-				//printf(" | ");
-				
+				switchscan = 0;
+				for (j = 0; j < N_COLS; j++) // 12 switches in each row
+					if (colvals[j] == GPIOD_LINE_VALUE_ACTIVE)
+						switchscan += 1 << j;
+
 				// stop sinking current from this row of switches
-				gpio_set_dir(rows[i], DIR_INPUT);
+				if (reconfigure(row_req[i], &rows[i], 1, IN_PULLUP) < 0) {
+					failed = 1;
+					break;
+				}
 
 				if (i==2)
 					check_rotary_encoders(switchscan);	// translate raw encoder data to switch position
@@ -244,14 +296,27 @@ void *blink(int *terminate)
 
 			}
 			// a full scan of all switch rows is now in gpio_switchstatus[]
-			gpio_hw_ready = 1;
-			//printf("\n");
+			if (!failed)
+				gpio_hw_ready = 1;
 		}
 	}
-	//printf("\nFP off\n");
-	// at this stage, all cols, rows, ledrows are set to input, so elegant way of closing down.
+	if (failed) {
+		gpio_hw_ready = 0;
+		printf("GPIO error - %s\n", strerror(errno));
+	}
 
-	return 0;
+out:
+	// Releasing the requests hands the lines back to the kernel as inputs.
+	if (ledrow_req)
+		gpiod_line_request_release(ledrow_req);
+	if (col_req)
+		gpiod_line_request_release(col_req);
+	for (i = 0; i < N_ROWS; i++)
+		if (row_req[i])
+			gpiod_line_request_release(row_req[i]);
+	gpiod_chip_close(chip);
+
+	return failed ? (void *)-1 : 0;
 }
 
 void short_wait(void) // creates pause required in between clocked GPIO settings changes
