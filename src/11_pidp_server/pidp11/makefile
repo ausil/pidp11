@@ -82,6 +82,7 @@ SOURCES.h = \
 	main.h	\
 	gpio.h	\
 	gpiopattern.h	\
+	../gpiohdr/gpiohdr.h	\
 	$(BLINKENLIGHT_SERVER_DIR)/print.h	\
 	$(BLINKENLIGHT_API_DIR)/blinkenlight_panels.h
 
@@ -89,6 +90,7 @@ SOURCES.c = \
 	main.c	\
 	gpio.c	\
 	gpiopattern.c	\
+	../gpiohdr/gpiohdr.c	\
 	$(BLINKENLIGHT_SERVER_DIR)/print.c	\
 	$(BLINKENLIGHT_API_SOURCES.c)
 

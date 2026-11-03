@@ -52,7 +52,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <gpiod.h>
+#include "../gpiohdr/gpiohdr.h"
 
 typedef unsigned int uint32;
 typedef signed int int32;
@@ -80,101 +80,6 @@ static const unsigned int ledrows[N_LEDROWS] = {20, 21, 22, 23, 24, 25};
 static const unsigned int rows[N_ROWS]       = {16, 17, 18};
 static const unsigned int cols[N_COLS]       = {26,27,4, 5,6,7, 8,9,10, 11,12,13};
 
-#define CONSUMER "pidp11"
-
-/* Find the GPIO chip that carries the 40-pin header. Its number differs
- * between Pi models (gpiochip4 on a Pi 5, gpiochip0 on a Pi 4), so look for
- * a "pinctrl-*" chip with enough lines instead of using a fixed index.
- * PIDP11_GPIOCHIP=/dev/gpiochipN overrides the search. */
-static struct gpiod_chip *open_header_chip(void)
-{
-	const char *forced = getenv("PIDP11_GPIOCHIP");
-	char path[32];
-	int n;
-
-	if (forced)
-		return gpiod_chip_open(forced);
-
-	for (n = 0; n < 64; n++) {
-		struct gpiod_chip *chip;
-		struct gpiod_chip_info *info;
-		int match = 0;
-
-		snprintf(path, sizeof path, "/dev/gpiochip%d", n);
-		chip = gpiod_chip_open(path);
-		if (!chip)
-			continue;
-		info = gpiod_chip_get_info(chip);
-		if (info) {
-			const char *label = gpiod_chip_info_get_label(info);
-			match = label && strncmp(label, "pinctrl-", 8) == 0
-				&& gpiod_chip_info_get_num_lines(info) >= 28;
-			gpiod_chip_info_free(info);
-		}
-		if (match)
-			return chip;
-		gpiod_chip_close(chip);
-	}
-	return NULL;
-}
-
-static struct gpiod_line_config *make_config(const unsigned int *offsets, size_t n,
-		enum gpiod_line_direction dir, enum gpiod_line_bias bias)
-{
-	struct gpiod_line_settings *ls = gpiod_line_settings_new();
-	struct gpiod_line_config *lc = gpiod_line_config_new();
-
-	if (!ls || !lc)
-		goto fail;
-	gpiod_line_settings_set_direction(ls, dir);
-	gpiod_line_settings_set_bias(ls, bias);
-	if (dir == GPIOD_LINE_DIRECTION_OUTPUT)
-		gpiod_line_settings_set_output_value(ls, GPIOD_LINE_VALUE_INACTIVE);
-	if (gpiod_line_config_add_line_settings(lc, offsets, n, ls) < 0)
-		goto fail;
-	gpiod_line_settings_free(ls);
-	return lc;
-fail:
-	gpiod_line_settings_free(ls);
-	gpiod_line_config_free(lc);
-	return NULL;
-}
-
-static struct gpiod_line_request *request_lines(struct gpiod_chip *chip,
-		const unsigned int *offsets, size_t n,
-		enum gpiod_line_direction dir, enum gpiod_line_bias bias)
-{
-	struct gpiod_line_config *lc = make_config(offsets, n, dir, bias);
-	struct gpiod_request_config *rc = gpiod_request_config_new();
-	struct gpiod_line_request *req = NULL;
-
-	if (lc && rc) {
-		gpiod_request_config_set_consumer(rc, CONSUMER);
-		req = gpiod_chip_request_lines(chip, rc, lc);
-	}
-	gpiod_request_config_free(rc);
-	gpiod_line_config_free(lc);
-	return req;
-}
-
-/* Change direction (and pull) of every line in a request. Output lines
- * start low. */
-static int reconfigure(struct gpiod_line_request *req, const unsigned int *offsets,
-		size_t n, enum gpiod_line_direction dir, enum gpiod_line_bias bias)
-{
-	struct gpiod_line_config *lc = make_config(offsets, n, dir, bias);
-	int ret;
-
-	if (!lc)
-		return -1;
-	ret = gpiod_line_request_reconfigure_lines(req, lc);
-	gpiod_line_config_free(lc);
-	return ret;
-}
-
-#define IN_PULLUP  GPIOD_LINE_DIRECTION_INPUT,  GPIOD_LINE_BIAS_PULL_UP
-#define OUT        GPIOD_LINE_DIRECTION_OUTPUT, GPIOD_LINE_BIAS_AS_IS
-
 void *blink(int *terminate)
 {
 	struct gpiod_chip *chip;
@@ -183,17 +88,17 @@ void *blink(int *terminate)
 	int i, j, k, switchscan;
 	int failed = 0;
 
-	chip = open_header_chip();
+	chip = gpiohdr_open_chip();
 	if (!chip) {
 		printf("No GPIO chips found\n");
 		return (void *)-1;
 	}
 
 	// LED rows: outputs, off. Columns: outputs, low. Switch rows: inputs with pull-up.
-	ledrow_req = request_lines(chip, ledrows, N_LEDROWS, OUT);
-	col_req = request_lines(chip, cols, N_COLS, OUT);
+	ledrow_req = gpiohdr_request(chip, ledrows, N_LEDROWS, GPIOHDR_OUT);
+	col_req = gpiohdr_request(chip, cols, N_COLS, GPIOHDR_OUT);
 	for (i = 0; i < N_ROWS; i++)
-		row_req[i] = request_lines(chip, &rows[i], 1, IN_PULLUP);
+		row_req[i] = gpiohdr_request(chip, &rows[i], 1, GPIOHDR_IN_PULLUP);
 
 	if (!ledrow_req || !col_req || !row_req[0] || !row_req[1] || !row_req[2]) {
 		printf("Failed to request GPIO lines - %s\n", strerror(errno));
@@ -223,7 +128,7 @@ void *blink(int *terminate)
 					gpiopattern_ledstatus_phases[gpiopattern_ledstatus_phases_readidx][phase];
 
 			// prepare for lighting LEDs by setting col pins to output
-			if (reconfigure(col_req, cols, N_COLS, OUT) < 0) {
+			if (gpiohdr_reconfigure(col_req, cols, N_COLS, GPIOHDR_OUT) < 0) {
 				failed = 1;
 				break;
 			}
@@ -255,7 +160,7 @@ void *blink(int *terminate)
 			}
 
 			// prepare for reading switches: flip columns to input, pull-ups on
-			if (reconfigure(col_req, cols, N_COLS, IN_PULLUP) < 0) {
+			if (gpiohdr_reconfigure(col_req, cols, N_COLS, GPIOHDR_IN_PULLUP) < 0) {
 				failed = 1;
 				break;
 			}
@@ -266,7 +171,7 @@ void *blink(int *terminate)
 				// on one row pin,
 				// output 0V to overrule the built-in pull-up from column input pin
 				// to read this row of switches
-				if (reconfigure(row_req[i], &rows[i], 1, OUT) < 0) {
+				if (gpiohdr_reconfigure(row_req[i], &rows[i], 1, GPIOHDR_OUT) < 0) {
 					failed = 1;
 					break;
 				}
@@ -284,7 +189,7 @@ void *blink(int *terminate)
 						switchscan += 1 << j;
 
 				// stop sinking current from this row of switches
-				if (reconfigure(row_req[i], &rows[i], 1, IN_PULLUP) < 0) {
+				if (gpiohdr_reconfigure(row_req[i], &rows[i], 1, GPIOHDR_IN_PULLUP) < 0) {
 					failed = 1;
 					break;
 				}

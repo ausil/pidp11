@@ -13,7 +13,10 @@ cmdfile="$PIDP11_RUNDIR/tmpsimhcommand.txt"
 
 while :; do
 	if [ "$PIDP11_BOOT" = panel ]; then
-		sw=$("$PIDP11_LIBEXECDIR/scansw")
+		sw=$("$PIDP11_LIBEXECDIR/scansw" 2>/dev/null)
+		case $sw in
+			''|*[!0-9]*) echo "scansw gave no switch reading, using 0000" >&2; sw=0 ;;
+		esac
 		boot=$(printf '%04o' $(( sw % 262144 )))
 	else
 		boot=$PIDP11_BOOT

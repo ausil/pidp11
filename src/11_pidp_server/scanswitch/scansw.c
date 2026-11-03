@@ -1,135 +1,73 @@
 /*
  * Scan switches for PiDP-11 front panel
- * 
+ *
  * www.obsolescenceguaranteed.blogspot.com
- * 
- * v20231218
-*/
+ *
+ * v20231218; libgpiod version 20261103
+ *
+ * Prints the state of the SR switches (rows 0 and 1) as
+ * (row1 << 12) | row0, with a set bit meaning "switch on".
+ * Errors go to stderr so stdout is always just the number.
+ */
 
-#include <unistd.h>
-#include <time.h>
-#include <stdint.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
-#include <stdlib.h>
-//#include "gpio.h"
-#include "pinctrl/gpiolib.h"
+#include <time.h>
+#include "../gpiohdr/gpiohdr.h"
 
-void short_wait(void);								// used as pause between clocked GPIO changes
+#define N_ROWS_SCANNED 2	// row 2 carries the rotary encoders, not switches
+#define N_COLS 12
+
+static const unsigned int rows[3] = {16, 17, 18};
+static const unsigned int cols[N_COLS] = {26,27,4, 5,6,7, 8,9,10, 11,12,13};
+
 long intervl = 1000000;		// pause
 
-
-// PART 1 - GPIO and RT process stuff ----------------------------------
-
-
- 
-// PART 2 - the multiplexing logic driving the front panel -------------
-
-uint8_t row; 
-uint8_t ledrows[] = {20, 21, 22, 23, 24, 25};
-uint8_t rows[] = {16, 17, 18};
-uint8_t cols[] = {26,27,4, 5,6,7, 8,9,10, 11,12,13};
-
-int main()
+int main(void)
 {
-	int i,j,k,switchscan[3], tmp;
-	uint8_t exVal = 0;
-	
-	// init GPIO stuff ----------
-        int num_gpios;
-	int ret;
+	struct gpiod_chip *chip;
+	struct gpiod_line_request *col_req, *row_req[N_ROWS_SCANNED];
+	enum gpiod_line_value colvals[N_COLS];
+	int switchscan[N_ROWS_SCANNED] = {0, 0};
+	int row, j;
 
-	ret = gpiolib_init();
-
-	if (ret < 0)
-	{
-		printf("Failed to initialise gpiolib - %d\n", ret);
+	chip = gpiohdr_open_chip();
+	if (!chip) {
+		fprintf(stderr, "No GPIO chips found\n");
 		return -1;
 	}
 
-	num_gpios = ret;
-	if (!num_gpios)
-	{
-		printf("No GPIO chips found\n");
+	// columns and rows idle as inputs with pull-ups
+	col_req = gpiohdr_request(chip, cols, N_COLS, GPIOHDR_IN_PULLUP);
+	for (row = 0; row < N_ROWS_SCANNED; row++)
+		row_req[row] = gpiohdr_request(chip, &rows[row], 1, GPIOHDR_IN_PULLUP);
+	if (!col_req || !row_req[0] || !row_req[1]) {
+		fprintf(stderr, "Failed to request GPIO lines - %s\n", strerror(errno));
 		return -1;
 	}
 
-	// -----
-	uint32_t gpiomask[(MAX_GPIO_PINS + 31)/32] = { 0 };
-#define ARRAY_SIZE(_a) (sizeof(_a)/sizeof(_a[0]))
-	for (i = ARRAY_SIZE(gpiomask) - 1; i >= 0; i--)
-	{
-		if (gpiomask[i])
-			break;
-	}
-	if (i < 0)
-		memset(gpiomask, 0xff, sizeof(gpiomask));
+	for (row = 0; row < N_ROWS_SCANNED; row++) {
+		// drive one row low; a pressed switch pulls its column low
+		if (gpiohdr_reconfigure(row_req[row], &rows[row], 1, GPIOHDR_OUT) < 0)
+			goto fail;
 
-	ret = gpiolib_mmap();
-	if (ret)
-	{
-		if (ret == EACCES && geteuid())
-			printf("Must be root\n");
-		else
-			printf("Failed to mmap gpiolib - %s\n", strerror(ret));
-		return -1;
+		nanosleep((struct timespec[]){{0, intervl/100}}, NULL); // probably unnecessary long wait
+
+		if (gpiod_line_request_get_values(col_req, colvals) < 0)
+			goto fail;
+		for (j = 0; j < N_COLS; j++)	// 12 switches in each row
+			if (colvals[j] == GPIOD_LINE_VALUE_INACTIVE)
+				switchscan[row] += 1 << j;
+
+		if (gpiohdr_reconfigure(row_req[row], &rows[row], 1, GPIOHDR_IN_PULLUP) < 0)
+			goto fail;
 	}
 
-	// initialise GPIO (all pins used as inputs, with pull-ups enabled on cols)
-	for (i=0;i<6;i++)
-	{
+	printf("%d\n", switchscan[1] << 12 | switchscan[0]);
+	return 0;
 
-		gpio_set_fsel(ledrows[i], GPIO_FSEL_INPUT);
-		//gpio_set_dir(ledrows[i], DIR_OUTPUT);
-		//gpio_set_drive(ledrows[i], DRIVE_LOW);
-	}
-	for (i=0;i<12;i++)
-	{
-		gpio_set_fsel(cols[i], GPIO_FSEL_INPUT);
-		gpio_set_pull(cols[i], PULL_UP);
-		//gpio_set_dir(cols[i], DIR_OUTPUT);
-		//gpio_set_drive(cols[i], DRIVE_LOW);
-	}
-	for (i=0;i<3;i++)
-	{
-		gpio_set_fsel(rows[i], GPIO_FSEL_INPUT);
-		//gpio_set_dir(rows[i], DIR_INPUT);
-		gpio_set_pull(rows[i], PULL_UP);
-	}
-
-	// --------------------------------------------------
-
-
-	// prepare for reading switches		
-
-	for(row = 0; row < 2; row++) {
-		// on one row pin, 
-		// output 0V to overrule the built-in pull-up from column input pin
-		// to read this row of switches
-		gpio_set_dir(rows[row], DIR_OUTPUT);
-		gpio_set_drive(rows[row], DRIVE_LOW);
-
-		nanosleep ((struct timespec[]){{0, intervl/100}}, NULL); // probably unnecessary long wait
-		switchscan[row]=0;
-
-		for(j=0;j<12;j++) {		// 12 switches in each row
-			tmp = gpio_get_level(cols[j]);
-
-			if(tmp==0)
-				switchscan[row] += 1<<j;// only allows for one switch (last one) to be detected in each row
-		}
-		gpio_set_dir(rows[row], DIR_INPUT);
-
-	}
-
-	printf("%d\n", switchscan[1]<<12 | switchscan[0]);
-	return switchscan[0];
-}
-
-
-void short_wait(void)				// creates pause required in between clocked GPIO settings changes
-{
-	fflush(stdout); //
-	usleep(100000); // suggested as alternative for asm which c99 does not accept
+fail:
+	fprintf(stderr, "GPIO error - %s\n", strerror(errno));
+	return -1;
 }
