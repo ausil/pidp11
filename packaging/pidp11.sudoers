@@ -1,0 +1,11 @@
+# Allow members of the pidp11 group to attach to the PiDP-11 console, which
+# is a screen session owned by the pidp11 system user.
+#
+# Only these exact command lines are permitted. Note that anyone who can
+# attach can use screen's ^A : commands to run programs as the pidp11 user,
+# so treat membership of the pidp11 group as trusted.
+Cmnd_Alias PIDP11_CONSOLE = \
+    /usr/bin/screen -ls pidp11, \
+    /usr/bin/screen -x pidp11
+
+%pidp11 ALL=(pidp11) NOPASSWD: PIDP11_CONSOLE
