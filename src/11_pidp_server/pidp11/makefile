@@ -32,6 +32,9 @@ endif
 
 endif
 
+# extra link flags from the caller (e.g. a distribution's hardening flags)
+LDFLAGS += $(EXTRA_LDFLAGS)
+
 # Reference also the standard blinkenbone server in BLINKENLIGHT_SERVER_DIR
 
 CCDEFS= \

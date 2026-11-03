@@ -50,7 +50,7 @@ $(B):
 # Blinkenlight RPC server for the front panel
 server: | $(B)
 	$(MAKE) -C $(SERVERDIR)/pidp11 MAKE_TARGET_ARCH=RPI OBJDIR=$(B) \
-	    CC_DBG_FLAGS='$(CFLAGS)' \
+	    CC_DBG_FLAGS='$(CFLAGS)' EXTRA_LDFLAGS='$(LDFLAGS)' \
 	    OS_CCDEFS='-DPIDP11_LIBEXECDIR=\"$(LIBEXECDIR)\"' \
 	    pidp1170_blinkenlightd
 
@@ -63,14 +63,18 @@ scansw: | $(B)
 # SIMH with the Blinkenlight console ("realcons")
 simh: | $(B)
 	$(MAKE) -C '$(SIMHSRC)' -f quickmake BIN=$(B)/ \
-	    CC_DBG_FLAGS='$(CFLAGS) -Wno-unused-result'
+	    CC_DBG_FLAGS='$(CFLAGS) -Wno-unused-result' EXTRA_LDFLAGS='$(LDFLAGS)'
 
 # Teletype terminal emulator. Builds in the source tree (st's Makefile).
 sty: | $(B)
 	$(MAKE) -C src/sty CPPFLAGS='-DPIDP11_SOUNDDIR=\"$(DATADIR)/sounds\"'
 	cp src/sty/sty $(B)/sty
 
-install: all
+# Install what "make" built; deliberately does not rebuild (an RPM build
+# runs "make install" in a different environment from "make").
+install:
+	@test -x $(B)/pidp1170_blinkenlightd -a -x $(B)/pdp11_realcons -a -x $(B)/scansw \
+	    || { echo "Nothing built in $(B): run 'make' first"; exit 1; }
 	install -d $(DESTDIR)$(LIBEXECDIR) $(DESTDIR)$(BINDIR) $(DESTDIR)$(DATADIR)/sounds \
 	    $(DESTDIR)$(DATADIR)/systems/idled $(DESTDIR)$(SYSCONFDIR)/pidp11 \
 	    $(DESTDIR)$(UNITDIR) $(DESTDIR)$(SYSUSERSDIR) $(DESTDIR)$(TMPFILESDIR) \
