@@ -1,0 +1,6 @@
+# Writable disk images, shared by every system; only the service writes here
+d /var/lib/pidp11          0755 pidp11 pidp11 -
+d /var/lib/pidp11/systems  0755 pidp11 pidp11 -
+# Seed the boot menu once; never overwritten afterwards
+C /var/lib/pidp11/systems/selections 0644 pidp11 pidp11 - /usr/share/pidp11/systems/selections
+C /var/lib/pidp11/systems/idled      0755 pidp11 pidp11 - /usr/share/pidp11/systems/idled

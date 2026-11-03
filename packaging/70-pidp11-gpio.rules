@@ -1,0 +1,4 @@
+# Give the pidp11 service access to the Raspberry Pi header GPIO chip
+# (pinctrl-rp1 on a Pi 5, pinctrl-bcm2711 on a Pi 4, ...). Other gpiochips
+# and hosts without such a chip are left alone.
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", ATTR{label}=="pinctrl-*", GROUP="pidp11", MODE="0660"

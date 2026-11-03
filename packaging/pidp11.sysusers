@@ -1,0 +1,2 @@
+# System user that owns the services, the disk images and the console session
+u pidp11 - "PiDP-11 simulator" /var/lib/pidp11 /usr/sbin/nologin

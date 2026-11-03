@@ -1,0 +1,17 @@
+[Unit]
+Description=PiDP-11 Blinkenlight panel server
+Documentation=https://github.com/obsolescence/pidp11
+After=network.target rpcbind.service
+Wants=rpcbind.service
+
+[Service]
+User=pidp11
+Group=pidp11
+ExecStart=/usr/libexec/pidp11/pidp1170_blinkenlightd
+# Real-time scheduling for the panel scan thread (harmless without a panel)
+AmbientCapabilities=CAP_SYS_NICE
+LimitRTPRIO=99
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

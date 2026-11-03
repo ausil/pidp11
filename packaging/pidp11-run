@@ -1,0 +1,27 @@
+#!/bin/bash
+# Runs inside the detached screen session started by pidp11-simh.service:
+# pick a system, start the simulator, and start it again if it asks for a
+# reboot (rebootsimh.sh writes "exit" into the command file).
+
+[ -r /etc/pidp11/pidp11.conf ] && . /etc/pidp11/pidp11.conf
+: "${PIDP11_BOOT:=0000}"
+: "${PIDP11_LIBEXECDIR:=/usr/libexec/pidp11}"
+: "${PIDP11_SYSTEMSDIR:=/var/lib/pidp11/systems}"
+: "${PIDP11_RUNDIR:=/run/pidp11}"
+
+cmdfile="$PIDP11_RUNDIR/tmpsimhcommand.txt"
+
+while :; do
+	if [ "$PIDP11_BOOT" = panel ]; then
+		sw=$("$PIDP11_LIBEXECDIR/scansw")
+		boot=$(printf '%04o' $(( sw % 262144 )))
+	else
+		boot=$PIDP11_BOOT
+	fi
+	sel=$(awk -v b="$boot" '$1 == b { print $2; exit }' "$PIDP11_SYSTEMSDIR/selections")
+	sel=${sel:-idled}
+	echo "*** booting $sel ***"
+	printf 'cd %s/%s\ndo boot.ini\n' "$PIDP11_SYSTEMSDIR" "$sel" > "$cmdfile"
+	"$PIDP11_LIBEXECDIR/pdp11_realcons" "$cmdfile"
+	[ "$(< "$cmdfile")" = exit ] || break
+done
