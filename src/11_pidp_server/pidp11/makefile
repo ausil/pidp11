@@ -120,11 +120,15 @@ endif
 	scp $(OBJDIR)/pidp1170_blinkenlightd $(SSHTARGET):
 
 
-pidp1170_blinkenlightd:	$(SOURCES.c) $(SOURCES.h)
-	# printenv | sort >env.make
-	${CC} $^ -o $@ $(CCDEFS) ${LDFLAGS}
-	mkdir -p $(OBJDIR)
-	mv $@ $(OBJDIR)
-	# Verify: was it x86 or ARM?
-	file $(OBJDIR)/$@
+# The binary is built directly into $(OBJDIR). (It used to be built in the
+# source directory and moved, so a stale copy left there made make report
+# "up to date" without producing anything in $(OBJDIR).)
+.PHONY: pidp1170_blinkenlightd
+pidp1170_blinkenlightd: $(OBJDIR)/pidp1170_blinkenlightd
 
+$(OBJDIR)/pidp1170_blinkenlightd:	$(SOURCES.c) $(SOURCES.h)
+	# printenv | sort >env.make
+	mkdir -p $(OBJDIR)
+	${CC} $(SOURCES.c) -o $@ $(CCDEFS) ${LDFLAGS}
+	# Verify: was it x86 or ARM?
+	file $@
