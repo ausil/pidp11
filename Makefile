@@ -42,7 +42,7 @@ SUBST = sed -e 's|/usr/libexec/pidp11|$(LIBEXECDIR)|g' \
             -e 's|/var/lib/pidp11|$(STATEDIR)|g' \
             -e 's|/etc/pidp11|$(SYSCONFDIR)/pidp11|g'
 
-all: server scansw simh $(if $(filter yes,$(WITH_STY)),sty)
+all: server scansw paneltest simh $(if $(filter yes,$(WITH_STY)),sty)
 
 $(B):
 	mkdir -p $(B)
@@ -60,6 +60,12 @@ scansw: | $(B)
 	    $(SERVERDIR)/scanswitch/scansw.c $(SERVERDIR)/gpiohdr/gpiohdr.c \
 	    $$(pkg-config --cflags --libs libgpiod)
 
+# Front panel LED/switch tester
+paneltest: | $(B)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(B)/paneltest \
+	    $(SERVERDIR)/paneltest/paneltest.c $(SERVERDIR)/gpiohdr/gpiohdr.c \
+	    $$(pkg-config --cflags --libs libgpiod)
+
 # SIMH with the Blinkenlight console ("realcons")
 simh: | $(B)
 	$(MAKE) -C '$(SIMHSRC)' -f quickmake BIN=$(B)/ \
@@ -74,6 +80,7 @@ sty: | $(B)
 # runs "make install" in a different environment from "make").
 install:
 	@test -x $(B)/pidp1170_blinkenlightd -a -x $(B)/pdp11_realcons -a -x $(B)/scansw \
+	    -a -x $(B)/paneltest \
 	    || { echo "Nothing built in $(B): run 'make' first"; exit 1; }
 	install -d $(DESTDIR)$(LIBEXECDIR) $(DESTDIR)$(BINDIR) $(DESTDIR)$(DATADIR)/sounds \
 	    $(DESTDIR)$(DATADIR)/systems/idled $(DESTDIR)$(SYSCONFDIR)/pidp11 \
@@ -81,6 +88,7 @@ install:
 	    $(DESTDIR)$(UDEVDIR) $(DESTDIR)$(SUDOERSDIR)
 	install -m 0755 $(B)/pidp1170_blinkenlightd $(B)/pdp11_realcons $(B)/scansw \
 	    $(DESTDIR)$(LIBEXECDIR)/
+	install -m 0755 $(B)/paneltest $(DESTDIR)$(BINDIR)/pidp11-paneltest
 	install -m 0755 bin/rebootsimh.sh $(DESTDIR)$(LIBEXECDIR)/
 	$(SUBST) packaging/pidp11-run > $(DESTDIR)$(LIBEXECDIR)/pidp11-run
 	chmod 0755 $(DESTDIR)$(LIBEXECDIR)/pidp11-run
@@ -110,4 +118,4 @@ clean:
 	rm -rf $(B)
 	-$(MAKE) -C src/sty clean
 
-.PHONY: all server scansw simh sty install clean
+.PHONY: all server scansw paneltest simh sty install clean

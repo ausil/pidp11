@@ -85,6 +85,7 @@ systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
 %files
 %doc README.md
 %{_bindir}/pdp11
+%{_bindir}/pidp11-paneltest
 %{_libexecdir}/pidp11/
 %{_unitdir}/pidp11-server.service
 %{_unitdir}/pidp11-simh.service
