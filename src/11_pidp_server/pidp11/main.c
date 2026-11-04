@@ -62,6 +62,7 @@
 #include <pthread.h>
 #include <inttypes.h> 
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "blinkenlight_panels.h"
 #include "blinkenlight_api_server_procs.h"
@@ -318,6 +319,69 @@ static void gpio_mux_thread_start()
 //    printf("Created \"gpio_mux\" thread\n");
 
     sleep(2); // allow 2 sec for multiplex to start
+}
+
+/*
+ * Publish the SR switches for the launcher (pidp11-run).
+ * Only one process can hold the GPIO lines, so scansw cannot be run while
+ * this server is up. Instead this thread keeps $PIDP11_RUNDIR/switches
+ * (default /dev/shm/pidp11) up to date: the same number scansw prints
+ * ((row1 << 12) | row0, bit set = switch on), or "none" if there is no
+ * panel hardware. It writes only when the value changes.
+ */
+static void *publish_switches(void *arg)
+{
+    const char *dir = getenv("PIDP11_RUNDIR");
+    char path[512], tmp[520];
+    unsigned long last = (unsigned long) -1;
+    int no_hw_written = 0, waited = 0;
+
+    (void) arg;
+    if (!dir || !*dir)
+        dir = "/dev/shm/pidp11";
+    mkdir(dir, 0755); // fine if it exists
+    snprintf(path, sizeof path, "%s/switches", dir);
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    unlink(path); // never leave a value from an earlier run
+
+    for (;;) {
+        unsigned long sr;
+        char text[32];
+        FILE *f;
+
+        usleep(100 * 1000);
+        if (!gpio_hw_ready) {
+            // blink() sets this after its first full scan; give it a few seconds
+            if (++waited > 30 && !no_hw_written) {
+                no_hw_written = 1;
+                last = (unsigned long) -1;
+                snprintf(text, sizeof text, "none\n");
+            } else
+                continue;
+        } else {
+            no_hw_written = 0;
+            // the scan gives 1 = open (pulled up); scansw reports 1 = closed
+            sr = (~gpio_switchstatus[0] & 0xfff) | ((~gpio_switchstatus[1] & 0xfff) << 12);
+            if (sr == last)
+                continue;
+            last = sr;
+            snprintf(text, sizeof text, "%lu\n", sr);
+        }
+        f = fopen(tmp, "w");
+        if (!f)
+            continue;
+        fputs(text, f);
+        if (fclose(f) == 0)
+            rename(tmp, path);
+    }
+    return NULL;
+}
+
+static void publish_switches_start()
+{
+    pthread_t t;
+    if (pthread_create(&t, NULL, publish_switches, NULL) == 0)
+        pthread_detach(t);
 }
 
 static void gpiopattern_start_thread()
@@ -716,6 +780,7 @@ int main(int argc, char *argv[])
 
     gpio_mux_thread_start();
     gpiopattern_start_thread();
+    publish_switches_start();
 
     blinkenlight_api_server();
     // does never end!

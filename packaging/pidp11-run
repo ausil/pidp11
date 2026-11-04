@@ -4,7 +4,7 @@
 # reboot (rebootsimh.sh writes "exit" into the command file).
 
 [ -r /etc/pidp11/pidp11.conf ] && . /etc/pidp11/pidp11.conf
-: "${PIDP11_BOOT:=0000}"
+: "${PIDP11_BOOT:=panel}"
 : "${PIDP11_LIBEXECDIR:=/usr/libexec/pidp11}"
 : "${PIDP11_SYSTEMSDIR:=/var/lib/pidp11/systems}"
 : "${PIDP11_RUNDIR:=/run/pidp11}"
@@ -13,10 +13,18 @@ cmdfile="$PIDP11_RUNDIR/tmpsimhcommand.txt"
 
 while :; do
 	if [ "$PIDP11_BOOT" = panel ]; then
-		sw=$("$PIDP11_LIBEXECDIR/scansw" 2>/dev/null)
+		# The server owns the GPIO lines and publishes the SR switches
+		# (same number scansw prints) in $PIDP11_RUNDIR/switches, or "none".
+		sw=
+		for _ in $(seq 100); do
+			sw=$(cat "$PIDP11_RUNDIR/switches" 2>/dev/null)
+			[ -n "$sw" ] && break
+			sleep 0.1
+		done
 		case $sw in
-			''|*[!0-9]*) echo "scansw gave no switch reading, using 0000" >&2; sw=0 ;;
+			''|*[!0-9]*) echo "no front panel switch reading (${sw:-timeout}), using 0000" >&2; sw=0 ;;
 		esac
+		# low 18 bits as octal; the high bits are reserved for future use
 		boot=$(printf '%04o' $(( sw % 262144 )))
 	else
 		boot=$PIDP11_BOOT
