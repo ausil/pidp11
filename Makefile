@@ -93,6 +93,9 @@ install:
 	$(SUBST) packaging/pidp11-run > $(DESTDIR)$(LIBEXECDIR)/pidp11-run
 	chmod 0755 $(DESTDIR)$(LIBEXECDIR)/pidp11-run
 	install -m 0755 etc/pdp.sh $(DESTDIR)$(BINDIR)/pdp11
+	$(SUBST) packaging/pidp11-install-systems > $(DESTDIR)$(BINDIR)/pidp11-install-systems
+	chmod 0755 $(DESTDIR)$(BINDIR)/pidp11-install-systems
+	install -m 0644 install/boot.ini.bilquist $(DESTDIR)$(DATADIR)/rsx11bq-boot.ini
 	install -m 0644 bin/sounds/*.wav $(DESTDIR)$(DATADIR)/sounds/
 	install -m 0644 systems/selections $(DESTDIR)$(DATADIR)/systems/
 	install -m 0644 systems/idled/boot.ini $(DESTDIR)$(DATADIR)/systems/idled/

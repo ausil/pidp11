@@ -1,0 +1,209 @@
+#!/bin/bash
+# Download and install PDP-11 operating system disk images into
+# /var/lib/pidp11/systems and register them in the boot selections menu.
+#
+#   pidp11-install-systems [options] [list | base | 211bsd+ | rsx11bq | all]
+#
+# Run as root (sudo); files end up owned by the pidp11 service account.
+# The disk images are read-write and hold your work, so existing files are
+# never overwritten unless you pass --force.
+
+set -eu
+
+SYSTEMSDIR=${PIDP11_SYSTEMSDIR:-/var/lib/pidp11/systems}
+DATADIR=${PIDP11_DATADIR:-/usr/share/pidp11}
+OWNER=pidp11
+
+BASE_URL=http://obsolescence.dev/pidp11/systems.tar.gz
+BSD_URL=https://github.com/chasecovello/211bsd-pidp11/raw/refs/heads/master
+RSX_URL=ftp://ftp.dfupdate.se/pub/pdp11/rsx/pidp
+
+force=0
+email=
+tarball=
+work=
+
+usage() {
+	cat <<USAGE
+usage: ${0##*/} [options] [command]
+
+commands:
+  list      show the systems installed and the boot selections (default)
+  base      the standard set: Unix v6/v7, System III/V, RSX-11M+, 2.11BSD...
+            (122 MB download, several GB installed)
+  211bsd+   Chase Covello's updated 2.11BSD (boot code 0211)
+  rsx11bq   Johnny Billquist's RSX-11M+ with BQTC/IP (boot code 2024)
+  all       base, 211bsd+ and rsx11bq
+
+options:
+  --force          overwrite files that already exist (destroys changes made
+                   to the disk images!)
+  --tarball FILE   use an already downloaded systems.tar.gz for 'base'
+  --email ADDRESS  email for the anonymous FTP login used by rsx11bq
+                   (a courtesy to the server's operator; default: none)
+
+Installs into $SYSTEMSDIR
+USAGE
+}
+
+die() { echo "${0##*/}: $*" >&2; exit 1; }
+
+need() {
+	for c in "$@"; do
+		command -v "$c" >/dev/null || die "'$c' is required but not installed"
+	done
+}
+
+cleanup() { [ -z "$work" ] || rm -rf "$work"; }
+trap cleanup EXIT
+
+# Add (or replace) a boot menu entry, drop the "not installed" placeholder
+# and keep the file sorted by code.
+add_selection() {	# code name
+	local f="$SYSTEMSDIR/selections" tmp
+	tmp=$(mktemp "$SYSTEMSDIR/.selections.XXXXXX")
+	{ [ -r "$f" ] && cat "$f"; printf '%s\t%s\n' "$1" "$2"; } |
+		awk '!/not installed/ { a[$1] = $0 } END { for (k in a) print a[k] }' |
+		sort >"$tmp"
+	chmod 0644 "$tmp"
+	mv "$tmp" "$f"
+	echo "  boot code $1 -> $2"
+}
+
+# Merge the menu shipped in the base tarball into ours.
+merge_selections() {	# file
+	local code name
+	while IFS=$'\t' read -r code name; do
+		[ -n "$code" ] && add_selection "$code" "$name"
+	done <"$1"
+}
+
+# Download URL to FILE without leaving a partial file behind.
+fetch() {	# url dest [curl args]
+	local url=$1 dest=$2
+	shift 2
+	curl -fL --retry 3 --progress-bar "$@" -o "$dest.part" "$url"
+	mv "$dest.part" "$dest"
+}
+
+# Install a downloaded file unless it exists already.
+keep_or_replace() {	# file; returns 0 if it may be (over)written
+	[ "$force" = 1 ] || [ ! -e "$1" ]
+}
+
+do_list() {
+	echo "Boot selections ($SYSTEMSDIR/selections):"
+	sed 's/^/  /' "$SYSTEMSDIR/selections" 2>/dev/null || echo "  (none)"
+	echo "System directories:"
+	for d in "$SYSTEMSDIR"/*/; do
+		[ -d "$d" ] && printf '  %s\n' "$(basename "$d")"
+	done
+}
+
+do_base() {
+	need tar gzip
+	local tb=$tarball
+	if [ -z "$tb" ]; then
+		need curl
+		tb="$work/systems.tar.gz"
+		echo "Downloading $BASE_URL"
+		fetch "$BASE_URL" "$tb"
+	fi
+	[ -r "$tb" ] || die "cannot read $tb"
+	local mode=--skip-old-files
+	[ "$force" = 1 ] && mode=--overwrite
+	echo "Unpacking (this takes a while)..."
+	# 'selections' is merged below instead of replacing ours
+	tar -xzf "$tb" -C "$SYSTEMSDIR" --strip-components=1 --no-same-owner \
+		$mode --exclude=systems/selections
+	tar -xzOf "$tb" systems/selections >"$work/selections"
+	echo "Adding boot selections:"
+	merge_selections "$work/selections"
+}
+
+do_211bsd() {
+	need curl unxz sed
+	local dir="$SYSTEMSDIR/211bsd+"
+	mkdir -p "$dir"
+	if keep_or_replace "$dir/boot.ini"; then
+		echo "Downloading boot.ini"
+		fetch "$BSD_URL/boot.ini" "$dir/boot.ini"
+		# no bmp280 sensor attached; connect the front panel
+		sed -i -e 's/^attach icr icr.txt$/;attach icr icr.txt/' \
+		       -e 's/^;set realcons connected$/set realcons connected/' "$dir/boot.ini"
+	else
+		echo "Keeping existing $dir/boot.ini (use --force to replace)"
+	fi
+	if keep_or_replace "$dir/2.11BSD_rq.dsk"; then
+		echo "Downloading disk image"
+		fetch "$BSD_URL/2.11BSD_rq.dsk.xz" "$dir/2.11BSD_rq.dsk.xz"
+		echo "Decompressing..."
+		unxz -f "$dir/2.11BSD_rq.dsk.xz"
+	else
+		echo "Keeping existing $dir/2.11BSD_rq.dsk (use --force to replace)"
+	fi
+	echo "Adding boot selection:"
+	add_selection 0211 211bsd+
+}
+
+do_rsx() {
+	need curl gunzip
+	local dir="$SYSTEMSDIR/rsx11bq" f
+	mkdir -p "$dir"
+	if keep_or_replace "$dir/boot.ini"; then
+		[ -r "$DATADIR/rsx11bq-boot.ini" ] || die "missing $DATADIR/rsx11bq-boot.ini"
+		cp "$DATADIR/rsx11bq-boot.ini" "$dir/boot.ini"
+	fi
+	for f in pidp.dsk pidp.tap; do
+		if keep_or_replace "$dir/$f"; then
+			echo "Downloading $f.gz from ftp.dfupdate.se"
+			fetch "$RSX_URL/$f.gz" "$dir/$f.gz" -u "anonymous:${email:-anonymous@}"
+			echo "Decompressing..."
+			gunzip -f "$dir/$f.gz"
+		else
+			echo "Keeping existing $dir/$f (use --force to replace)"
+		fi
+	done
+	echo "Adding boot selection:"
+	add_selection 2024 rsx11bq
+}
+
+cmds=
+while [ $# -gt 0 ]; do
+	case $1 in
+		--force) force=1 ;;
+		--tarball) [ $# -ge 2 ] || die "--tarball needs a file"; tarball=$2; shift ;;
+		--email) [ $# -ge 2 ] || die "--email needs an address"; email=$2; shift ;;
+		-h|--help) usage; exit 0 ;;
+		-*) usage >&2; exit 2 ;;
+		*) cmds="$cmds $1" ;;
+	esac
+	shift
+done
+cmds=${cmds:-list}
+
+for c in $cmds; do
+	case $c in list|base|211bsd+|rsx11bq|all) ;; *) usage >&2; exit 2 ;; esac
+done
+
+if [ "$cmds" != " list" ] && [ "$cmds" != list ]; then
+	[ -d "$SYSTEMSDIR" ] || die "$SYSTEMSDIR does not exist (is pidp11 installed? try systemd-tmpfiles --create pidp11.conf)"
+	[ -w "$SYSTEMSDIR" ] || die "cannot write to $SYSTEMSDIR; run with sudo"
+	work=$(mktemp -d "${TMPDIR:-/var/tmp}/pidp11-systems.XXXXXX")
+fi
+
+for c in $cmds; do
+	case $c in
+		list)    do_list ;;
+		base)    do_base ;;
+		211bsd+) do_211bsd ;;
+		rsx11bq) do_rsx ;;
+		all)     do_base; do_211bsd; do_rsx ;;
+	esac
+done
+
+# the service runs as pidp11 and writes to the disk images
+if [ "$(id -u)" = 0 ] && getent passwd "$OWNER" >/dev/null && [ "$cmds" != " list" ]; then
+	chown -R "$OWNER:$OWNER" "$SYSTEMSDIR"
+fi
+[ "$cmds" = " list" ] || echo "Done. Set the SR switches (or PIDP11_BOOT in /etc/pidp11/pidp11.conf) to a boot code above."

@@ -86,6 +86,7 @@ systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
 %doc README.md
 %{_bindir}/pdp11
 %{_bindir}/pidp11-paneltest
+%{_bindir}/pidp11-install-systems
 %{_libexecdir}/pidp11/
 %{_unitdir}/pidp11-server.service
 %{_unitdir}/pidp11-simh.service
@@ -100,6 +101,7 @@ systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
 %attr(0440,root,root) %config(noreplace) %{_sysconfdir}/sudoers.d/pidp11
 %dir %{_datadir}/pidp11
 %{_datadir}/pidp11/systems/
+%{_datadir}/pidp11/rsx11bq-boot.ini
 
 %files sty
 %{_bindir}/pidp11-sty
