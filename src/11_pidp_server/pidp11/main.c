@@ -63,6 +63,7 @@
 #include <inttypes.h> 
 #include <unistd.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "blinkenlight_panels.h"
 #include "blinkenlight_api_server_procs.h"
@@ -127,6 +128,72 @@ blinkenlight_control_t *leds_ADDRESS, *leds_DATA, *led_PARITY_HIGH, *led_PARITY_
 
 
 /*
+ * Power switch: reboot the simulator or shut the host down.
+ * The host is only touched when all of these hold:
+ *  - real panel hardware delivered a switch scan (gpio_hw_ready)
+ *  - the switch was seen "on" at least once since the server started, so a
+ *    switch that is already off at boot does nothing
+ *  - it stays "off" for POWER_HOLD_S seconds, which ignores glitches
+ *  - it acts once per press, until the switch goes back "on"
+ * PIDP11_POWER=off in the environment disables the host shutdown (the
+ * simulator reboot still works).
+ */
+#define POWER_HOLD_S 1.0
+
+static int power_armed = 0;
+static int power_low = 0;
+static struct timespec power_low_since;
+
+static void power_switch_check(int on)
+{
+    struct timespec now;
+    char buffer[255];
+    const char *mode;
+    FILE *cmd;
+
+    if (on) {
+        power_armed = 1;
+        power_low = 0;
+        pwrDebounce = 0; // power button released
+        return;
+    }
+    if (!power_armed || pwrDebounce)
+        return;
+
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if (!power_low) {
+        power_low = 1;
+        power_low_since = now;
+        return;
+    }
+    if ((now.tv_sec - power_low_since.tv_sec)
+            + (now.tv_nsec - power_low_since.tv_nsec) / 1e9 < POWER_HOLD_S)
+        return;
+
+    pwrDebounce = 1; // do it only once per press
+
+    if (switch_HALT->value == 0) {
+        snprintf(buffer, sizeof buffer, "%s/rebootsimh.sh", PIDP11_LIBEXECDIR);
+        printf("\r\n--> Rebooting...\r\n");
+        cmd = popen(buffer, "r");
+        if (cmd)
+            pclose(cmd);
+    } else {
+        mode = getenv("PIDP11_POWER");
+        if (mode && strcmp(mode, "off") == 0) {
+            printf("--> Power switch pressed, host shutdown disabled (PIDP11_POWER=off)\r\n");
+            return;
+        }
+        snprintf(buffer, sizeof buffer, "%s/down.sh", PIDP11_LIBEXECDIR);
+        printf("--> System shutdown - allow 15 seconds before power off\r\n");
+        fflush(stdout);
+        cmd = popen(buffer, "r");
+        if (cmd)
+            pclose(cmd);
+    }
+}
+
+/*
  *	RPC server callbacks:
  *	here conversion between PiDP11 gpio and Blinkenlight API is done!
  */
@@ -148,31 +215,8 @@ static void on_blinkenlight_api_panel_get_controlvalues(blinkenlight_panel_t *p)
 				// looks like "power switch off". The value is still passed on to the client
 				// unchanged, but the host shutdown/reboot below must only happen after the
 				// GPIO thread has delivered a real switch scan.
-				if (gpio_hw_ready && (c->value)==0)
-				{
-					if (pwrDebounce==0)	// do it only once, when power button is triggered
-					{
-						char buffer[255];
-						pwrDebounce=1;	// do it only once, when power button is triggered
-						
-						if (switch_HALT->value==0)
-						{
-							snprintf(buffer,sizeof buffer,"%s/rebootsimh.sh",PIDP11_LIBEXECDIR);
-							FILE *bootfil = popen(buffer, "r");
-							printf("\r\n--> Rebooting...\r\n");
-							pclose(bootfil);
-						}
-						else
-						{
-							snprintf(buffer,sizeof buffer,"%s/down.sh",PIDP11_LIBEXECDIR);
-							FILE *bootfil = popen(buffer, "r");
-							printf("--> System shutdown - allow 15 seconds before power off\r\n");
-							pclose(bootfil);
-						}
-					}
-				}
-				else
-					pwrDebounce=0;	// power button released
+				if (gpio_hw_ready)
+					power_switch_check(c->value != 0);
 			}
             else if (c == switch_PANEL_LOCK)
                 c->value = panel_lock; // send "panel lock" switch as defined by -L

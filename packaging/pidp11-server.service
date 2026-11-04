@@ -9,6 +9,7 @@ User=pidp11
 Group=pidp11
 # rebootsimh.sh writes its request here for pidp11-run to pick up
 Environment=PIDP11_RUNDIR=/run/pidp11
+EnvironmentFile=-/etc/pidp11/pidp11.conf
 ExecStart=/usr/libexec/pidp11/pidp1170_blinkenlightd
 # Real-time scheduling for the panel scan thread (harmless without a panel)
 AmbientCapabilities=CAP_SYS_NICE

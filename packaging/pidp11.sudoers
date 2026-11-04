@@ -9,3 +9,7 @@ Cmnd_Alias PIDP11_CONSOLE = \
     /usr/bin/screen -x pidp11
 
 %pidp11 ALL=(pidp11) NOPASSWD: PIDP11_CONSOLE
+
+# The server powers the host off when the front panel power switch is turned
+# off (see down.sh). Set PIDP11_POWER=off in /etc/pidp11/pidp11.conf to disable.
+pidp11 ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
