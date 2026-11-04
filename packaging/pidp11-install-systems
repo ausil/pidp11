@@ -180,13 +180,13 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-cmds=${cmds:-list}
+cmds=${cmds:- list}
 
 for c in $cmds; do
 	case $c in list|base|211bsd+|rsx11bq|all) ;; *) usage >&2; exit 2 ;; esac
 done
 
-if [ "$cmds" != " list" ] && [ "$cmds" != list ]; then
+if [ "$cmds" != " list" ]; then
 	[ -d "$SYSTEMSDIR" ] || die "$SYSTEMSDIR does not exist (is pidp11 installed? try systemd-tmpfiles --create pidp11.conf)"
 	[ -w "$SYSTEMSDIR" ] || die "cannot write to $SYSTEMSDIR; run with sudo"
 	work=$(mktemp -d "${TMPDIR:-/var/tmp}/pidp11-systems.XXXXXX")
