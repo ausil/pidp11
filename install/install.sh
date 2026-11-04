@@ -48,10 +48,10 @@ while true; do
             myusername=$(whoami)
             mygroup=$(id -g -n)
             sudo chown -R $myusername:$mygroup /opt/pidp11
-            # make sure pidp11 simulator has the right privileges
-            # to access GPIO with root privileges:
-            sudo chmod +s /opt/pidp11/src/11_pidp_server/scanswitch/scansw
-            sudo chmod +s /opt/pidp11/src/11_pidp_server/pidp11/bin-rpi/pidp1170_blinkenlightd
+            # GPIO is accessed through libgpiod (/dev/gpiochipN), which
+            # needs membership of the gpio group, not root or setuid:
+            sudo usermod -aG gpio $myusername
+            echo "Log out and in again for the gpio group to take effect."
             # to run a RT thread:
             sudo setcap cap_sys_nice+ep /opt/pidp11/src/11_pidp_server/pidp11/bin-rpi/pidp1170_blinkenlightd
 	    echo Done.
@@ -83,6 +83,8 @@ while true; do
             sudo apt install -y screen
             # Install newer RPC system
             sudo apt install -y libtirpc-dev
+            #Install libgpiod, used to drive the front panel GPIOs
+            sudo apt install -y libgpiod-dev
             break
 	    ;;
         [Nn]* ) 
