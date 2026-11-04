@@ -10,7 +10,8 @@ Group=pidp11
 WorkingDirectory=/var/lib/pidp11/systems
 # Attach with: pdp11   (see /usr/share/pidp11/README for the sudo setup)
 ExecStart=/usr/bin/screen -dmS pidp11 /usr/libexec/pidp11/pidp11-run
-ExecStop=/usr/bin/screen -S pidp11 -X quit
+ExecStop=/usr/libexec/pidp11/pidp11-stop
+TimeoutStopSec=20
 # pcap networking without running as root
 AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
 Restart=on-failure

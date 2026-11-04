@@ -1,0 +1,20 @@
+#!/bin/sh
+# ExecStop for pidp11-simh. SIMH catches SIGHUP/SIGTERM and only drops to its
+# "sim>" prompt, so killing the screen session leaves it waiting until
+# systemd's stop timeout. Ask it to quit instead: Ctrl-E (SIMH's break key)
+# stops a running guest, the CR clears a half-typed line, then "quit".
+# This powers the simulated machine off; it does not shut the guest down.
+
+alive() { screen -ls pidp11 2>/dev/null | grep -q '\.pidp11[[:space:]]'; }
+
+alive || exit 0
+screen -S pidp11 -X stuff "$(printf '\005\r')"
+sleep 0.3
+screen -S pidp11 -X stuff "$(printf 'quit\r')"
+i=0
+while alive && [ "$i" -lt 50 ]; do
+	sleep 0.1
+	i=$((i + 1))
+done
+alive && screen -S pidp11 -X quit
+exit 0

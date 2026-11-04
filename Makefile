@@ -92,6 +92,7 @@ install:
 	install -m 0755 bin/rebootsimh.sh $(DESTDIR)$(LIBEXECDIR)/
 	$(SUBST) packaging/pidp11-run > $(DESTDIR)$(LIBEXECDIR)/pidp11-run
 	chmod 0755 $(DESTDIR)$(LIBEXECDIR)/pidp11-run
+	install -m 0755 packaging/pidp11-stop $(DESTDIR)$(LIBEXECDIR)/pidp11-stop
 	install -m 0755 etc/pdp.sh $(DESTDIR)$(BINDIR)/pdp11
 	$(SUBST) packaging/pidp11-install-systems > $(DESTDIR)$(BINDIR)/pidp11-install-systems
 	chmod 0755 $(DESTDIR)$(BINDIR)/pidp11-install-systems
