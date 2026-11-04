@@ -106,7 +106,7 @@ install:
 	install -m 0644 packaging/pidp11.sysusers $(DESTDIR)$(SYSUSERSDIR)/pidp11.conf
 	$(SUBST) packaging/pidp11.tmpfiles > $(DESTDIR)$(TMPFILESDIR)/pidp11.conf
 	chmod 0644 $(DESTDIR)$(TMPFILESDIR)/pidp11.conf
-	install -m 0644 packaging/70-pidp11-gpio.rules $(DESTDIR)$(UDEVDIR)/
+	install -m 0644 packaging/99-pidp11-gpio.rules $(DESTDIR)$(UDEVDIR)/
 	install -m 0440 packaging/pidp11.sudoers $(DESTDIR)$(SUDOERSDIR)/pidp11
 ifeq ($(WITH_STY),yes)
 	install -d $(DESTDIR)$(APPSDIR)

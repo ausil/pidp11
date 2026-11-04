@@ -1,0 +1,11 @@
+# Give the pidp11 service access to the Raspberry Pi header GPIO chip.
+# Other gpiochips and hosts without such a chip are left alone.
+#
+# The /dev/gpiochipN node has no "label" attribute, so match the platform
+# device it hangs off instead:
+#   pinctrl-bcm2835  Pi 1-4 (and Zero); the chip's label is pinctrl-bcm2711 on a Pi 4
+#   pinctrl-rp1      Pi 5 (RP1 south bridge)
+#
+# Named 99-* so that it runs after Raspberry Pi OS's 99-com.rules, which
+# sets GROUP="gpio" on every gpio device; the last assignment wins.
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", SUBSYSTEMS=="platform", DRIVERS=="pinctrl-bcm2835|pinctrl-rp1", GROUP="pidp11", MODE="0660"

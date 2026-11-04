@@ -92,7 +92,7 @@ systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
 %{_unitdir}/pidp11-simh.service
 %{_sysusersdir}/%{name}.conf
 %{_tmpfilesdir}/%{name}.conf
-%{_udevrulesdir}/70-pidp11-gpio.rules
+%{_udevrulesdir}/99-pidp11-gpio.rules
 %ghost %dir %attr(0755,pidp11,pidp11) /run/pidp11
 %ghost %dir %attr(0755,pidp11,pidp11) %{_sharedstatedir}/pidp11
 %ghost %dir %attr(0755,pidp11,pidp11) %{_sharedstatedir}/pidp11/systems
