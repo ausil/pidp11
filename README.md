@@ -68,3 +68,25 @@ For either maximum pain or maximum demonstration value (it depends on your minds
 </table>      
 <br>
 The <b>hidden front panel controls</b> (if you have PiDP-11 front panel hardware!) are unchanged from how they were described in the manual: https://obsolescence.dev/pidp11/PiDP-11_Manual.pdf. Reboot into a new OS with the front panel switches set, or shut down with HALT enabled, pressing the top rotary knob.
+
+# RPM packaging
+
+The Fedora-style snapshot RPMs are built from the Makefile, following the same layout as the [Tek4010](https://github.com/rricharz/Tek4010) and [vt05](https://github.com/aap/vt05) projects:
+
+    make dist      # source tarball (git archive) into ./dist
+    make rpm       # RPMs + source RPM into ./dist-rpm
+    make rpmlint   # build, then rpmlint with packaging/rpmlint.toml
+
+The package installs two systemd services, `pidp11-server` (the panel server; works without panel hardware) and `pidp11-simh` (the simulator). Disk images are not part of the package — run `sudo pidp11-install-systems base` after installing. The rpmlint config filters only known false positives (sudoers mode 0440 required by sudo(5); the not-yet-registered `pidp11` service account).
+
+## Terminal clients
+
+The `pidp11-sty` subpackage brings the Teletype emulator and its desktop entry. For more period-correct terminals on the PDP-11 — as the console, or as extra terminals for the machine's other users (it is a timesharing system!) — build the RPMs from the sibling projects and install them on the client side:
+
+    # in the vt05 checkout (https://github.com/aap/vt05)
+    make rpm && sudo dnf install dist-rpm/*/vt05-*.rpm
+
+    # in the Tek4010 checkout (https://github.com/rricharz/Tek4010)
+    make rpm && sudo dnf install dist-rpm/*/tek4010-*.rpm
+
+Then point them at the PiDP-11 instead of your shell, e.g. `vt05 pdp11` for a VT05-style console, or use them over the simulated serial/dial-up lines for additional user terminals (see the manual).

@@ -1,0 +1,26 @@
+# Local rpmlint overrides for the pidp11 package.
+#
+#   rpmlint -c packaging/rpmlint.toml packaging/pidp11.spec dist-rpm/*/*.rpm
+#
+# or just "make rpmlint". These filters are deliberate and each one is a
+# known false positive or a not-yet-registered upstream state; none of
+# them hides a real defect.
+
+# rpmlint config files are flat key = value TOML (like
+# /etc/xdg/rpmlint/fedora.toml), so Filters must not be nested in a
+# section header.
+Filters = [
+    # sudo(5) ignores sudoers.d files unless they are mode 0440 and not
+    # group/world writable, so the file cannot be "readable" by everyone.
+    # Drop once rpmlint exempts /etc/sudoers.d the way it exempts
+    # /etc/shadow and friends.
+    '.*non-readable /etc/sudoers\.d/pidp11 440.*',
+
+    # pidp11 is a new service account (created via sysusers.d, per the
+    # Fedora packaging guidelines). rpmlint only stops reporting these
+    # once the name is merged into its Fedora users-groups list
+    # (/etc/xdg/rpmlint/users-groups.toml, upstream rpmlint config).
+    # Drop these two lines after that registration lands.
+    '.*non-standard-uid .*pidp11.*',
+    '.*non-standard-gid .*pidp11.*',
+]

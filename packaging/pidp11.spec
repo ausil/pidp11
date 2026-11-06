@@ -1,10 +1,10 @@
-# Snapshot build: packaging/build-rpm.sh passes gitrev/gitdate for the commit.
 %{!?gitrev: %global gitrev unknown}
 %{!?gitdate: %global gitdate 00000000}
+%global snapshot %{gitdate}git%{gitrev}
 
 Name:           pidp11
 Version:        0
-Release:        0.1.%{gitdate}git%{gitrev}%{?dist}
+Release:        0.1.%{snapshot}%{?dist}
 Summary:        PiDP-11 front panel server and SIMH PDP-11 simulator
 
 # FIXME: unreviewed. The tree mixes SIMH and BlinkenBone (MIT-style), st
@@ -12,7 +12,9 @@ Summary:        PiDP-11 front panel server and SIMH PDP-11 simulator
 # licence of the Teletype sound samples is not recorded in the repository.
 License:        MIT
 URL:            https://github.com/obsolescence/pidp11
-Source0:        pidp11.tar.gz
+# Produced by "make dist" (git archive of the current tree). The #fragment
+# names the file rpmbuild looks for in %%{_sourcedir}.
+Source0:        %{url}/archive/%{gitrev}/%{name}-%{snapshot}.tar.gz#/%{name}-%{snapshot}.tar.gz
 
 BuildRequires:  gcc
 BuildRequires:  make
@@ -42,25 +44,28 @@ Requires:       sudo
 
 %description
 A PDP-11 simulator (SIMH) together with the Blinkenlight server that drives
-the PiDP-11 front panel, packaged as two systemd services:
-
-  pidp11-server  the panel server (works without panel hardware)
-  pidp11-simh    the simulator; its console is a screen session
+the PiDP-11 front panel. Two services are installed: the panel server
+(pidp11-server, which works even without panel hardware) and the
+simulator, whose console is a screen session.
 
 Disk images live in /var/lib/pidp11/systems and are not part of this
-package. Start the simulator with "systemctl enable --now pidp11-simh" and
-attach to its console with "pdp11" (the user must be in group pidp11).
+package; fetch them with "pidp11-install-systems". Enable and start the
+simulator, then attach to its console with "pdp11" (the user must be in
+group pidp11).
 
 %package sty
 Summary:        Teletype terminal emulator for the PiDP-11
 Requires:       %{name} = %{version}-%{release}
 
 %description sty
-sty is an X11 terminal emulator styled after a Teletype, with sound. The
-desktop entry opens it attached to the PiDP-11 console.
+sty is an X11 terminal emulator styled after a Teletype, with sampled
+Teletype sound. The desktop entry opens it attached to the PiDP-11
+console. For other period terminals on the console, or extra terminals
+for more users of this multi-user machine, install the vt05 or tek4010
+packages.
 
 %prep
-%autosetup -n pidp11
+%autosetup -n %{name}-%{snapshot}
 
 %build
 %set_build_flags
@@ -98,18 +103,26 @@ systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
 %ghost %dir %attr(0755,pidp11,pidp11) %{_sharedstatedir}/pidp11/systems
 %dir %{_sysconfdir}/pidp11
 %config(noreplace) %{_sysconfdir}/pidp11/pidp11.conf
+# 0440 is what sudo(5) requires for sudoers.d files; see rpmlint.toml for
+# the matching "non-readable" filter.
 %attr(0440,root,root) %config(noreplace) %{_sysconfdir}/sudoers.d/pidp11
 %dir %{_datadir}/pidp11
 %{_datadir}/pidp11/systems/
 %{_datadir}/pidp11/rsx11bq-boot.ini
+# brp-compress gzips man pages, so match both spellings.
+%{_mandir}/man1/pdp11.1*
+%{_mandir}/man1/pidp11-install-systems.1*
+%{_mandir}/man1/pidp11-paneltest.1*
 
 %files sty
+%doc README.md
 %{_bindir}/pidp11-sty
 %dir %{_datadir}/pidp11
 %{_datadir}/pidp11/sounds/
 %{_datadir}/pidp11/tty.svg
 %{_datadir}/applications/pidp11-tty.desktop
+%{_mandir}/man1/pidp11-sty.1*
 
 %changelog
-* Tue Nov 03 2026 Dennis Gilmore <dennis@ausil.us> - 0-0.1
+* Tue Nov 03 2026 Dennis Gilmore <dennis@ausil.us> - 0-0.1.20261103gitab50e3b
 - Initial snapshot package

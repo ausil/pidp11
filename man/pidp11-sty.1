@@ -1,0 +1,80 @@
+.Dd November 5, 2026
+.Dt PIDP11-STY 1
+.Os
+.Sh NAME
+.Nm pidp11-sty
+.Nd Teletype terminal emulator for the PiDP-11
+.Sh SYNOPSIS
+.Nm
+.Op Fl aiv
+.Op Fl c Ar class
+.Op Fl f Ar font
+.Op Fl g Ar geometry
+.Op Fl n Ar name
+.Op Fl o Ar file
+.Op Fl T Ar title
+.Op Fl t Ar title
+.Op Fl w Ar windowid
+.Op Fl e Ar command Op Ar arguments ...
+.Sh DESCRIPTION
+.Nm
+is an X11 terminal emulator styled after a Teletype Model 33, based on
+the simple terminal
+.Xr st 1 .
+It runs
+.Ar command
+attached to a pseudo-terminal
+.Pq or a
+.Ar line
+device with
+.Fl l ,
+rendering output in its own window at the excruciating 10 characters
+per second, accompanied by sampled Teletype clatter.
+.Pp
+The packaged desktop entry
+.Pq Teletype
+runs
+.Bd -literal -offset indent
+pidp11-sty bash pdp11
+.Ed
+.Pp
+which opens the console of the simulated PDP-11
+(see
+.Xr pdp11 1 )
+in the Teletype window.
+.Sh OPTIONS
+.Nm
+accepts the usual
+.Xr st 1
+options; the ones most often needed are:
+.Bl -tag -width Ds
+.It Fl f Ar font
+Render text with
+.Ar font
+(an X core font name).
+.It Fl g Ar geometry
+Set the initial window size and position,
+.Ar CxR Ns + Ns Ar x Ns + Ns Ar y
+in characters.
+.It Fl T Ar title
+Set the window title.
+.It Fl e Ar command ...
+Run
+.Ar command
+instead of the shell.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev DISPLAY
+The X server to open the window on.
+.It Ev SHELL
+The shell to run when no
+.Fl e
+command is given.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr pdp11 1 ,
+.Xr vt05 1 ,
+.Xr tek4010 1

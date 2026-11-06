@@ -2,6 +2,13 @@
 #
 #   make                    build everything into ./build
 #   make install DESTDIR=/tmp/root PREFIX=/usr
+#   make dist               source tarball (git archive) into ./dist
+#   make rpm                RPMs + source RPM into ./dist-rpm
+#   make rpmlint            build the RPMs, then check them with rpmlint
+#
+# The RPM targets follow the same layout as the Tek4010 and vt05 projects
+# (those provide tek4010/vt05 RPMs that work well as extra terminal
+# clients; see README.md).
 #
 # Builds are out of tree (into $(BUILDDIR)); the prebuilt binaries tracked
 # in the repository are never touched. CFLAGS/LDFLAGS from the environment
@@ -16,6 +23,7 @@ PREFIX      ?= /usr
 BINDIR      ?= $(PREFIX)/bin
 LIBEXECDIR  ?= $(PREFIX)/libexec/pidp11
 DATADIR     ?= $(PREFIX)/share/pidp11
+MANDIR      ?= $(PREFIX)/share/man
 APPSDIR     ?= $(PREFIX)/share/applications
 SYSCONFDIR  ?= /etc
 UNITDIR     ?= $(PREFIX)/lib/systemd/system
@@ -28,6 +36,19 @@ STATEDIR    ?= /var/lib/pidp11
 BUILDDIR    ?= build
 # set WITH_STY=no to skip the Teletype terminal (needs several SDL2 libs)
 WITH_STY    ?= yes
+
+# RPM / snapshot naming (packaging/pidp11.spec reads gitrev+gitdate as
+# macros; the tarball basename must match Source0 there).
+NAME        ?= pidp11
+DIST_DIR    ?= dist
+RPM_DIR     ?= dist-rpm
+GITREV      ?= $(shell git rev-parse --short HEAD)
+GITDATE     ?= $(shell git show -s --format=%cd --date=format:%Y%m%d HEAD)
+SNAPSHOT    := $(GITDATE)git$(GITREV)
+TARBALL     := $(NAME)-$(SNAPSHOT).tar.gz
+# committed state plus uncommitted changes to tracked files; new files
+# must be 'git add'ed before they show up in the tarball
+TREE        := $(shell t=$$(git stash create); echo $${t:-HEAD})
 
 CC          ?= gcc
 CFLAGS      ?= -O2 -g
@@ -110,8 +131,13 @@ install:
 	chmod 0644 $(DESTDIR)$(TMPFILESDIR)/pidp11.conf
 	install -m 0644 packaging/99-pidp11-gpio.rules $(DESTDIR)$(UDEVDIR)/
 	install -m 0440 packaging/pidp11.sudoers $(DESTDIR)$(SUDOERSDIR)/pidp11
+	install -Dm 0644 man/pdp11.1 $(DESTDIR)$(MANDIR)/man1/pdp11.1
+	install -Dm 0644 man/pidp11-install-systems.1 \
+	    $(DESTDIR)$(MANDIR)/man1/pidp11-install-systems.1
+	install -Dm 0644 man/pidp11-paneltest.1 $(DESTDIR)$(MANDIR)/man1/pidp11-paneltest.1
 ifeq ($(WITH_STY),yes)
 	install -d $(DESTDIR)$(APPSDIR)
+	install -Dm 0644 man/pidp11-sty.1 $(DESTDIR)$(MANDIR)/man1/pidp11-sty.1
 	install -m 0755 $(B)/sty $(DESTDIR)$(BINDIR)/pidp11-sty
 	sed -e 's|/opt/pidp11/bin/sty|$(BINDIR)/pidp11-sty|' \
 	    -e 's|/opt/pidp11/install|$(DATADIR)|' install/tty.desktop \
@@ -119,8 +145,28 @@ ifeq ($(WITH_STY),yes)
 	install -m 0644 install/tty.svg $(DESTDIR)$(DATADIR)/
 endif
 
+# ---- RPM (same dist/rpm layout as the Tek4010 and vt05 projects) ----------
+
+dist:
+	mkdir -p $(DIST_DIR)
+	git archive --format=tar --prefix=$(NAME)-$(SNAPSHOT)/ $(TREE) | gzip > $(DIST_DIR)/$(TARBALL)
+
+rpm: dist
+	mkdir -p $(RPM_DIR)
+	rpmbuild -ba \
+	  --define "_sourcedir $(CURDIR)/$(DIST_DIR)" \
+	  --define "_rpmdir $(CURDIR)/$(RPM_DIR)" \
+	  --define "_srcrpmdir $(CURDIR)/$(RPM_DIR)" \
+	  --define "_rpmfilename %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
+	  --define "gitrev $(GITREV)" \
+	  --define "gitdate $(GITDATE)" \
+	  packaging/pidp11.spec
+
+rpmlint: rpm
+	rpmlint -c packaging/rpmlint.toml packaging/pidp11.spec $(RPM_DIR)/*.rpm
+
 clean:
-	rm -rf $(B)
+	rm -rf $(B) $(DIST_DIR) $(RPM_DIR)
 	-$(MAKE) -C src/sty clean
 
-.PHONY: all server scansw paneltest simh sty install clean
+.PHONY: all server scansw paneltest simh sty install dist rpm rpmlint clean

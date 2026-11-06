@@ -1,0 +1,54 @@
+.Dd November 5, 2026
+.Dt PDP11 1
+.Os
+.Sh NAME
+.Nm pdp11
+.Nd attach to the PiDP-11 console
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+attaches to the console of the simulated PDP-11.
+The console runs as a
+.Xr screen 1
+session named
+.Ar pidp11
+in the background, so the PDP-11 does not notice when
+.Nm
+detaches.
+The console follows the terminal you call
+.Nm
+from: call it from a login prompt, a remote
+.Xr ssh 1
+session or a desktop terminal and it appears there.
+.Pp
+When the packaged system services are installed the screen session belongs
+to the
+.Ar pidp11
+service account.
+.Nm
+then joins it through
+.Xr sudo 8
+(see
+.Pa /etc/sudoers.d/pidp11 )
+so that several users can share the console at once.
+Otherwise it takes over the session belonging to the calling user.
+.Pp
+If no session is running,
+.Nm
+prints
+.Dq PiDP-11 is not running
+on stderr and exits 1; start the simulator service first.
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+Call it from a fresh login to get the PDP-11 console in that terminal:
+.Bd -literal -offset indent
+pdp11
+.Ed
+.Sh SEE ALSO
+.Xr screen 1 ,
+.Xr pidp11-sty 1 ,
+.Xr pidp11-install-systems 1 ,
+.Xr vt05 1 ,
+.Xr tek4010 1

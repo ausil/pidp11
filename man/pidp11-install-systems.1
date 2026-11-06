@@ -1,0 +1,86 @@
+.Dd November 5, 2026
+.Dt PIDP11-INSTALL-SYSTEMS 1
+.Os
+.Sh NAME
+.Nm pidp11-install-systems
+.Nd download and install PDP-11 operating system disk images
+.Sh SYNOPSIS
+.Nm
+.Op Fl -force
+.Op Fl -tarball Ar file
+.Op Fl -email Ar address
+.Op Ar
+.Sh DESCRIPTION
+.Nm
+downloads PDP-11 operating system disk images into
+.Pa /var/lib/pidp11/systems
+and registers them in the front panel boot selections menu.
+Run it as root
+.Pq Xr sudo 8 ;
+the installed files end up owned by the
+.Ar pidp11
+service account.
+.Pp
+The disk images are read-write and hold your work, so existing files are
+never overwritten unless
+.Fl -force
+is given.
+.Sh COMMANDS
+With no command,
+.Cm list
+is the default.
+.Bl -tag -width Ds
+.It Cm list
+Show the systems installed and the boot selections.
+.It Cm base
+The standard set: Unix v6/v7, System III/V, RSX-11M+, 2.11BSD and
+more (a 122 MB download, several GB installed).
+.It Cm 211bsd+
+Chase Covello's updated 2.11BSD (boot code 0211).
+.It Cm rsx11bq
+Johnny Billquist's RSX-11M+ with BQTC/IP (boot code 2024).
+.It Cm all
+.Cm base ,
+.Cm 211bsd+
+and
+.Cm rsx11bq .
+.El
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl -force
+Overwrite files that already exist.
+This destroys any changes made to the disk images!
+.It Fl -tarball Ar file
+Use an already downloaded
+.Ar file
+(a systems.tar.gz) for the
+.Cm base
+command instead of fetching it.
+.It Fl -email Ar address
+Email address for the anonymous FTP login used by
+.Cm rsx11bq ,
+a courtesy to the server's operator.
+Default: none.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev PIDP11_SYSTEMSDIR
+Install directory for the disk images.
+Default:
+.Pa /var/lib/pidp11/systems .
+.It Ev PIDP11_DATADIR
+Directory holding the boot selections file and boot scripts.
+Default:
+.Pa /usr/share/pidp11 .
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+Fetch everything and then show what is installed:
+.Bd -literal -offset indent
+sudo pidp11-install-systems all
+pidp11-install-systems list
+.Ed
+.Sh SEE ALSO
+.Xr pdp11 1 ,
+.Xr pidp11-sty 1

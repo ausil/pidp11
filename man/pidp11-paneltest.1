@@ -1,0 +1,52 @@
+.Dd November 5, 2026
+.Dt PIDP11-PANELTEST 1
+.Os
+.Sh NAME
+.Nm pidp11-paneltest
+.Nd exercise the PiDP-11 front panel without the simulator
+.Sh SYNOPSIS
+.Nm
+.Op Fl an
+.Op Fl s Ar ms
+.Sh DESCRIPTION
+.Nm
+drives the PiDP-11 front panel directly through the Raspberry Pi GPIO
+header, without SIMH or the panel server.
+It steps a single lit LED through all 72 LEDs (6 rows by 12 columns)
+while continuously scanning the 3 x 12 switch matrix.
+Whenever a switch changes state it is reported, along with the current
+state of all three rows; a set bit means
+.Dq switch closed .
+.Pp
+Switch rows 0 and 1 hold the SR switches and the ADDR/DATA select and
+similar; row 2 bits 8-11 are the two rotary encoders, whose gray-code
+states are shown raw.
+.Pp
+Only one program can hold the GPIO lines at a time, so stop the panel
+server first
+.Pq Cm systemctl stop pidp11-server .
+.Dl Ctrl-C
+releases the lines again.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl s Ar ms
+Milliseconds per LED step (default 200).
+.It Fl a
+Light all LEDs at once instead of chasing one.
+.It Fl n
+No LEDs: only watch the switches.
+.It Fl h
+Show the usage message and exit.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.It
+The following diagnostics are printed on stderr:
+.Bl -tag -width Ds
+.It No "No Raspberry Pi GPIO header chip found"
+The program is running on a machine without the Pi GPIO header, or the
+libgpiod chip cannot be found.
+.El
+.El
+.Sh SEE ALSO
+.Xr pdp11 1

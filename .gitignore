@@ -1,3 +1,6 @@
 ignore-systems/
 systems.tar
 build/
+dist/
+dist-rpm/
+rpmbuild/

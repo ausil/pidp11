@@ -1,15 +1,17 @@
 #!/bin/bash
 # Build the RPMs from the current git tree (committed state plus any
-# uncommitted changes to tracked files; new untracked files are not included).
-#   packaging/build-rpm.sh [topdir]     default topdir: ./rpmbuild
+# uncommitted changes to tracked files; new untracked files are not
+# included unless 'git add'ed first). Thin wrapper over "make rpm",
+# which follows the dist/rpm layout of the Tek4010 and vt05 projects:
+#
+#   make rpm          tarball in ./dist, RPMs in ./dist-rpm
+#   make rpmlint      build, then rpmlint with packaging/rpmlint.toml
+#
+# Usage: packaging/build-rpm.sh [outdir]    default outdir: ./dist-rpm
 set -e
 cd "$(git rev-parse --show-toplevel)"
-top=$(realpath -m "${1:-rpmbuild}")
-tree=$(git stash create || true)
-tree=${tree:-HEAD}
-rev=$(git rev-parse --short HEAD)
-date=$(git show -s --format=%cd --date=format:%Y%m%d HEAD)
-mkdir -p "$top"/{SOURCES,BUILD,RPMS,SRPMS}
-git archive --prefix=pidp11/ "$tree" | gzip > "$top/SOURCES/pidp11.tar.gz"
-rpmbuild -ba --define "_topdir $top" --define "gitrev $rev" --define "gitdate $date" \
-    packaging/pidp11.spec
+if [ $# -gt 0 ]; then
+    out=$(realpath -m "$1")
+    exec make rpm RPM_DIR="$out" DIST_DIR="$out/dist"
+fi
+exec make rpm
