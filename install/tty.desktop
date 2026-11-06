@@ -1,9 +1,9 @@
 [Desktop Entry]
 Name=Teletype
 Comment=Teletype for PiDP-11
-Exec=/opt/pidp11/bin/sty bash pdp11
+Exec=/usr/bin/pidp11-sty bash pdp11
 Terminal=false
 Type=Application
-Icon=/opt/pidp11/install/tty.svg
+Icon=/usr/share/pidp11/tty.svg
 Categories=X-PDP11;
 StartupNotify=false

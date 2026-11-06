@@ -81,12 +81,14 @@ The package installs two systemd services, `pidp11-server` (the panel server; wo
 
 ## Terminal clients
 
-The `pidp11-sty` subpackage brings the Teletype emulator and its desktop entry. For more period-correct terminals on the PDP-11 — as the console, or as extra terminals for the machine's other users (it is a timesharing system!) — build the RPMs from the sibling projects and install them on the client side:
+`pidp11` recommends `pidp11-sty`, `vt05` and `tek4010`, so `dnf install pidp11` takes the Teletype emulator and the DEC and Tektronix terminals with it wherever those packages are available, and it installs a menu entry for each one — Teletype, VT-52, VT-52 full screen, Tektronix 4010 — that opens straight onto the PDP-11 console. `--setopt=install_weak_deps=False` leaves all of that off a machine that only drives the front panel; the entries carry `TryExec` keys, so a terminal you skipped does not leave a dead icon in the menu.
 
-    # in the vt05 checkout (https://github.com/aap/vt05)
+`vt05` and `tek4010` are separate projects ([aap/vt05](https://github.com/aap/vt05) and [rricharz/Tek4010](https://github.com/rricharz/Tek4010)) and are not in the Fedora repositories yet, so until they are, build them from a checkout and dnf will take them from there:
+
+    # in the vt05 checkout
     make rpm && sudo dnf install dist-rpm/*/vt05-*.rpm
 
-    # in the Tek4010 checkout (https://github.com/rricharz/Tek4010)
+    # in the Tek4010 checkout
     make rpm && sudo dnf install dist-rpm/*/tek4010-*.rpm
 
-Then point them at the PiDP-11 instead of your shell, e.g. `vt05 pdp11` for a VT05-style console, or use them over the simulated serial/dial-up lines for additional user terminals (see the manual).
+From a shell the same console is `vt05 pdp11`; the manual covers pointing them at the simulated serial and dial-up lines to give the machine's other users terminals of their own.

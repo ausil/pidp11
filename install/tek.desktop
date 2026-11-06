@@ -1,9 +1,10 @@
 [Desktop Entry]
 Name=Tektronix
 Comment=Tektronix 4010
-Exec=/opt/pidp11/bin/tek4010 bash pdp11
+Exec=/usr/bin/tek4010 bash pdp11
+TryExec=/usr/bin/tek4010
 Terminal=false
 Type=Application
-Icon=/opt/pidp11/install/tek.svg
+Icon=/usr/share/pidp11/tek.svg
 Categories=X-PDP11;
 StartupNotify=false

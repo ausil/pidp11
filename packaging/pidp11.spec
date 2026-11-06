@@ -1,10 +1,18 @@
-%{!?gitrev: %global gitrev unknown}
-%{!?gitdate: %global gitdate 00000000}
-%global snapshot %{gitdate}git%{gitrev}
+# CalVer: Version is the YYYY.MM release, srcdate the snapshot within it.
+# Both segments compare numerically, so 2026.12 > 2026.11 > 2026.9 with no
+# padding tricks. Cut a release by bumping Version and srcdate.
+#
+# Nothing here is derived from git. The commit that records a value is never
+# the commit whose value it is, so a git-derived version, release or archive
+# name is stale the moment it is committed, and a plain "rpmbuild -bs" then
+# goes looking for a tarball nobody ever made. The upstream commit a release
+# snapshots belongs in %%changelog, where being wrong is only a stale
+# comment.
+%global srcdate 20261105
 
 Name:           pidp11
-Version:        0
-Release:        0.1.%{snapshot}%{?dist}
+Version:        2026.11
+Release:        0.1.%{srcdate}%{?dist}
 Summary:        PiDP-11 front panel server and SIMH PDP-11 simulator
 
 # FIXME: unreviewed. The tree mixes SIMH and BlinkenBone (MIT-style), st
@@ -12,9 +20,13 @@ Summary:        PiDP-11 front panel server and SIMH PDP-11 simulator
 # licence of the Teletype sound samples is not recorded in the repository.
 License:        MIT
 URL:            https://github.com/obsolescence/pidp11
-# Produced by "make dist" (git archive of the current tree). The #fragment
-# names the file rpmbuild looks for in %%{_sourcedir}.
-Source0:        %{url}/archive/%{gitrev}/%{name}-%{snapshot}.tar.gz#/%{name}-%{snapshot}.tar.gz
+# Produced by "make dist" (git archive of the tree, --prefix=%%{srcname}/),
+# which takes this name out of the spec with "rpmspec -P" instead of inventing
+# its own, so the two cannot drift apart and no --define is needed to build
+# the source RPM somewhere that has no checkout. rpmbuild takes the file from
+# %%{_sourcedir}; nothing here is ever downloaded.
+%global srcname %{name}-%{version}-%{srcdate}
+Source0:        %{srcname}.tar.gz
 
 BuildRequires:  gcc
 BuildRequires:  make
@@ -40,6 +52,17 @@ Requires:       rpcbind
 # The console runs in a screen session; pdp11 attaches through sudo.
 Requires:       screen
 Requires:       sudo
+# The Teletype emulator and its desktop entry. Its own subpackage only so
+# that the SDL2/X11 stack and the sampled Teletype noise can be left out;
+# a panel server with no screen is the case where it is not wanted.
+Recommends:     %{name}-sty = %{version}-%{release}
+# Period terminals, one for the console ("vt05 pdp11") and -- this is a
+# timesharing machine -- more for its other users over the serial lines.
+# Their own upstreams and their own RPMs, hence weak deps: on by default,
+# because a PDP-11 wants a period-correct terminal, and skippable with
+# --setopt=install_weak_deps=False by whoever only drives the front panel.
+Recommends:     vt05
+Recommends:     tek4010
 %{?systemd_requires}
 
 %description
@@ -53,6 +76,10 @@ package; fetch them with "pidp11-install-systems". Enable and start the
 simulator, then attach to its console with "pdp11" (the user must be in
 group pidp11).
 
+The console works in any terminal. The recommended vt05 and tek4010
+packages give it a period-correct one, and can be pointed at the serial
+lines as extra terminals for other users.
+
 %package sty
 Summary:        Teletype terminal emulator for the PiDP-11
 Requires:       %{name} = %{version}-%{release}
@@ -65,7 +92,7 @@ for more users of this multi-user machine, install the vt05 or tek4010
 packages.
 
 %prep
-%autosetup -n %{name}-%{snapshot}
+%autosetup -n %{srcname}
 
 %build
 %set_build_flags
@@ -75,7 +102,10 @@ packages.
 %make_install PREFIX=%{_prefix}
 
 %check
-desktop-file-validate %{buildroot}%{_datadir}/applications/pidp11-tty.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/pidp11-tty.desktop \
+    %{buildroot}%{_datadir}/applications/pidp11-vt52.desktop \
+    %{buildroot}%{_datadir}/applications/pidp11-vt52-fullscreen.desktop \
+    %{buildroot}%{_datadir}/applications/pidp11-tek4010.desktop
 
 %post
 systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
@@ -109,6 +139,15 @@ systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
 %dir %{_datadir}/pidp11
 %{_datadir}/pidp11/systems/
 %{_datadir}/pidp11/rsx11bq-boot.ini
+%{_datadir}/pidp11/vt52.svg
+%{_datadir}/pidp11/tek.svg
+# Console launchers for the recommended terminals, which is why they live
+# here rather than with pidp11-tty.desktop in the sty subpackage: they need
+# vt05 and tek4010, not sty. The TryExec keys hide them from the menu when
+# those packages were skipped.
+%{_datadir}/applications/pidp11-vt52.desktop
+%{_datadir}/applications/pidp11-vt52-fullscreen.desktop
+%{_datadir}/applications/pidp11-tek4010.desktop
 # brp-compress gzips man pages, so match both spellings.
 %{_mandir}/man1/pdp11.1*
 %{_mandir}/man1/pidp11-install-systems.1*
@@ -124,5 +163,10 @@ systemd-tmpfiles --create %{_tmpfilesdir}/%{name}.conf || :
 %{_mandir}/man1/pidp11-sty.1*
 
 %changelog
-* Tue Nov 03 2026 Dennis Gilmore <dennis@ausil.us> - 0-0.1.20261103gitab50e3b
-- Initial snapshot package
+* Thu Nov 05 2026 Dennis Gilmore <dennis@ausil.us> - 2026.11-0.1.20261105
+- Snapshot of upstream 44a98d6.
+- Recommend the period terminal packages (vt05, tek4010) and the sty
+  subpackage, rather than leaving them to be discovered in the README
+- CalVer Version (YYYY.MM) with a date in Release telling the snapshots of
+  one month apart, and nothing in the spec derived from git, so the source
+  RPM builds outside the checkout with no macros passed

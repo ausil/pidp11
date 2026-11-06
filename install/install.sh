@@ -272,10 +272,16 @@ while true; do
     read -p "Add VT-52 desktop icon and desktop settings? " prxn
     case $prxn in
         [Yy]* ) 
-            cp /opt/pidp11/install/vt52.desktop $HOME/Desktop/
-            cp /opt/pidp11/install/vt52fullscreen.desktop $HOME/Desktop/
-            cp /opt/pidp11/install/tty.desktop $HOME/Desktop/
-            cp /opt/pidp11/install/tek.desktop $HOME/Desktop/
+            # These four name the /usr layout the RPM installs into, and sty
+            # is renamed pidp11-sty there; this flow keeps everything under
+            # /opt/pidp11, so put the paths back. pdp11control.desktop was
+            # written for /opt and is copied as is.
+            for d in vt52 vt52fullscreen tty tek; do
+                sed -e 's|/usr/bin/pidp11-sty|/opt/pidp11/bin/sty|g' \
+                    -e 's|/usr/bin/|/opt/pidp11/bin/|g' \
+                    -e 's|/usr/share/pidp11/|/opt/pidp11/install/|g' \
+                    /opt/pidp11/install/$d.desktop > $HOME/Desktop/$d.desktop
+            done
             cp /opt/pidp11/install/pdp11control.desktop $HOME/Desktop/
 
             #make pcmanf run on double click, change its config file
