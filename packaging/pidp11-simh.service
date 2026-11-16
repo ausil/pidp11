@@ -8,8 +8,14 @@ Type=forking
 User=pidp11
 Group=pidp11
 WorkingDirectory=/var/lib/pidp11/systems
+# /usr/bin/screen is setgid root:screen so it can create its socket in
+# /run/screen; that bit is suppressed here because AmbientCapabilities= makes
+# systemd set NO_NEW_PRIVS. Grant the group instead. See packaging/pidp11-screen.
+SupplementaryGroups=screen
 # Attach with: pdp11   (see /usr/share/pidp11/README for the sudo setup)
-ExecStart=/usr/bin/screen -dmS pidp11 /usr/libexec/pidp11/pidp11-run
+# Via a wrapper, not /usr/bin/screen directly: systemd (init_t) is denied
+# execute on the confined screen_exec_t type. See packaging/pidp11-screen.
+ExecStart=/usr/libexec/pidp11/pidp11-screen -dmS pidp11 /usr/libexec/pidp11/pidp11-run
 ExecStop=/usr/libexec/pidp11/pidp11-stop
 TimeoutStopSec=20
 # pcap networking without running as root

@@ -1,0 +1,24 @@
+#!/bin/sh
+# ExecStart wrapper for pidp11-simh.service. systemd must not name
+# /usr/bin/screen directly in ExecStart, for two independent reasons:
+#
+#   SELinux: the binary is screen_exec_t, and policy grants the transition into
+#   screen_t to the legacy daemon domain only. systemd itself (init_t) is
+#   denied { execute } and the unit dies at status=203/EXEC with
+#   "Failed at step EXEC spawning /usr/bin/screen: Permission denied".
+#   Executing it from a bin_t script starts screen from the unconfined service
+#   domain, which is permitted.
+#
+#   screen's setgid bit (root:screen, which is what lets it create its socket
+#   in /run/screen at 0775 root:screen) never takes effect under this unit:
+#   AmbientCapabilities= makes systemd set NO_NEW_PRIVS, and that suppresses
+#   setuid/setgid bits on exec. The unit compensates with
+#   SupplementaryGroups=screen, so the group rather than the bit is what makes
+#   the socket directory writable for the pidp11 user.
+#
+# Deliberately no SCREENDIR: keeping the compiled-in socket directory means
+# pidp11-stop, and the sudoed "screen -ls/-x pidp11" that pdp11 runs for an
+# operator, keep finding the session without extra environment in three places
+# (sudo strips env by default, so SCREENDIR would have needed a sudoers Setenv
+# as well to keep pdp11 working).
+exec /usr/bin/screen "$@"
